@@ -3,9 +3,8 @@ setlocal EnableExtensions
 
 REM Usage: scripts\start.bat [dev|prod]   (default: dev)
 REM Starts the environment (Postgres, migrations, seed) and the site in a separate
-REM window. Press any key in THIS window to stop the site and the database.
-
-set "APP_WINDOW_TITLE=PROJECT_JANUS_APP"
+REM window (PROJECT_JANUS_APP, see launch-app.ps1). Press any key in THIS window
+REM to stop the site and the database.
 
 cd /d "%~dp0.."
 
@@ -100,12 +99,11 @@ if /I "%MODE%"=="prod" (
   echo [start] Building production bundle...
   call npm run build
   if errorlevel 1 exit /b 1
-  echo [start] Starting production server in a separate window...
-  start "%APP_WINDOW_TITLE%" cmd /k "title %APP_WINDOW_TITLE% & npm run start"
-) else (
-  echo [start] Starting dev server in a separate window...
-  start "%APP_WINDOW_TITLE%" cmd /k "title %APP_WINDOW_TITLE% & npm run dev"
 )
+
+echo [start] Starting %MODE% server in a separate window...
+set "APP_PID="
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0launch-app.ps1" -Mode %MODE%`) do set "APP_PID=%%I"
 goto waitforstop
 
 :appalreadyrunning
@@ -118,8 +116,8 @@ echo [start] Press any key in THIS window to stop the server and the database...
 pause >nul
 
 echo [start] Stopping server...
+if defined APP_PID taskkill /PID %APP_PID% /T /F >nul 2>&1
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do taskkill /F /PID %%P >nul 2>&1
-taskkill /FI "WINDOWTITLE eq %APP_WINDOW_TITLE%" /T /F >nul 2>&1
 
 echo [start] Stopping database...
 docker compose stop

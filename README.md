@@ -134,6 +134,7 @@ cp .env.example .env
 docker-compose.yml        — Postgres для dev/сервера (persistent volume, healthcheck)
 /scripts
   start.bat, start.sh      — поднять окружение + запустить сайт (dev|prod)
+  launch-app.ps1           — вспомогательный скрипт start.bat (окно сайта + его PID)
   stop.bat, stop.sh        — остановить Postgres
   metrics.ts               — расчёт базовых метрик
 /app
