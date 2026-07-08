@@ -1,4 +1,63 @@
 {
-  "folders": [],
-  "files": []
+  "folders": [
+    {
+      "path": "/ARCHIVE",
+      "name": "ARCHIVE",
+      "parentPath": null,
+      "visibleToRole": null
+    },
+    {
+      "path": "/ARCHIVE/TACTICAL",
+      "name": "TACTICAL",
+      "parentPath": "/ARCHIVE",
+      "visibleToRole": null
+    }
+  ],
+  "files": [
+    {
+      "folderPath": "/ARCHIVE",
+      "filename": "SITREP-004",
+      "extension": ".LOG",
+      "requiredModuleKey": "TEXT_VIEWER",
+      "visibleToRole": null,
+      "analysisSummary": "АНАЛИЗ ЗАВЕРШЁН: текстовый журнал, стандартная кодировка. Обнаружены следы правки после архивирования. Содержание — донесение с необозначенного объекта, часть строк повреждена.",
+      "fullContent": "ОПЕРАТИВНАЯ СВОДКА №004\nОБЪЕКТ: [ДАННЫЕ ПОВРЕЖДЕНЫ]\nСТАТУС СВЯЗИ: ПРЕРЫВИСТЫЙ\n\n...приём ведётся с задержкой, источник не подтверждён. Повторяю: приказ об эвакуации архива не поступал. Ждём подтверждения из центра.\n\n[TODO: заменить финальным текстом от нарративного дизайнера]"
+    },
+    {
+      "folderPath": "/ARCHIVE",
+      "filename": "PERSONNEL-CARD",
+      "extension": ".TXT",
+      "requiredModuleKey": "TEXT_VIEWER",
+      "visibleToRole": null,
+      "analysisSummary": "АНАЛИЗ ЗАВЕРШЁН: личное дело, формат читаемый. Часть полей заблокирована грифом давности, не снятым автоматически.",
+      "fullContent": "ЛИЧНАЯ КАРТОЧКА\nИМЯ: [ИЗЪЯТО]\nДОПУСК: УРОВЕНЬ 2\nПРИМЕЧАНИЕ: ДОСТУП К СЕКТОРУ B ОГРАНИЧЕН ДО ОСОБОГО РАСПОРЯЖЕНИЯ.\n\n[TODO: заменить финальным текстом от нарративного дизайнера]"
+    },
+    {
+      "folderPath": "/ARCHIVE/TACTICAL",
+      "filename": "READINESS-77",
+      "extension": ".LOG",
+      "requiredModuleKey": "TEXT_VIEWER",
+      "visibleToRole": "SECURITY_OFFICER",
+      "analysisSummary": "АНАЛИЗ ЗАВЕРШЁН: журнал боеготовности. Гриф ограничения снят частично — доступ только для профиля службы безопасности.",
+      "fullContent": "ЖУРНАЛ БОЕГОТОВНОСТИ, СЕКТОР 77\nПОСЛЕДНЯЯ ПРОВЕРКА: [ДАТА ПОВРЕЖДЕНА]\nСТАТУС: ОБЪЕКТ НА КОНСЕРВАЦИИ, ОХРАНА СНЯТА ЧАСТИЧНО.\n\n[TODO: заменить финальным текстом от нарративного дизайнера]"
+    },
+    {
+      "folderPath": "/ARCHIVE/TACTICAL",
+      "filename": "SITREP-004B",
+      "extension": ".TAC",
+      "requiredModuleKey": "MAP_VIEWER",
+      "visibleToRole": null,
+      "analysisSummary": "АНАЛИЗ ЧАСТИЧНЫЙ: обнаружены координатные кластеры и слои нестандартного формата. Для корректного отображения требуется модуль пространственной визуализации (MAP_VIEWER). ДОСТУП К ПОЛНОМУ СОДЕРЖИМОМУ ОТКЛОНЁН.",
+      "fullContent": "[ТАКТИЧЕСКАЯ КАРТА — БИНАРНЫЙ СЛОЙ]\nКООРДИНАТНАЯ СЕТКА: 12 УЗЛОВ\nМЕТКИ: ОБЪЕКТ-01, ПЕРИМЕТР-А, ПЕРИМЕТР-Б\n\n[TODO: заменить финальным содержимым карты от нарративного дизайнера — доступно только через MAP_VIEWER]"
+    },
+    {
+      "folderPath": "/ARCHIVE/TACTICAL",
+      "filename": "COORD-INDEX",
+      "extension": ".TAC",
+      "requiredModuleKey": "MAP_VIEWER",
+      "visibleToRole": null,
+      "analysisSummary": "АНАЛИЗ ЧАСТИЧНЫЙ: индекс координат, привязанный к тактической карте SITREP-004B. Формат не поддерживается текущим набором модулей. ДОСТУП К ПОЛНОМУ СОДЕРЖИМОМУ ОТКЛОНЁН.",
+      "fullContent": "[ИНДЕКС КООРДИНАТ]\nССЫЛКА: SITREP-004B\nЗАПИСЕЙ: 12\n\n[TODO: заменить финальным содержимым от нарративного дизайнера — доступно только через MAP_VIEWER]"
+    }
+  ]
 }

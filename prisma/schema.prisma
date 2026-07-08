@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -10,4 +8,114 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+model Player {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(UNASSIGNED)
+  createdAt    DateTime @default(now())
+  trustLevel   Int      @default(0) // уровень доверия ИИ к игроку, задел на будущее
+
+  chatSessions  ChatSession[]
+  moduleUnlocks PlayerModuleUnlock[]
+  fileAnalyses  PlayerFileAnalysis[]
+}
+
+enum Role {
+  UNASSIGNED
+  ARCHIVIST // Архивист
+  TECHNICIAN // Техник
+  SECURITY_OFFICER // Офицер безопасности
+}
+
+// --- Диалог с ИИ ---
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  playerId  String
+  player    Player        @relation(fields: [playerId], references: [id])
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([playerId])
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id])
+  role      MessageRole // PLAYER | AI
+  content   String
+  createdAt DateTime    @default(now())
+
+  @@index([sessionId])
+}
+
+enum MessageRole {
+  PLAYER
+  AI
+}
+
+// --- Командные модули (подпрограммы терминала) ---
+
+model CommandModule {
+  key          String  @id // FILE_MANAGER, FILE_ANALYZER, TEXT_VIEWER, SEARCH, MEMORY_MANAGER, MAP_VIEWER, ...
+  name         String // отображаемое имя, например "АНАЛИЗАТОР ФАЙЛОВ"
+  description  String
+  isDefault    Boolean @default(false) // true = доступен всем ролям сразу после регистрации
+  requiredRole Role? // если задано — доступен только этой роли (сверх изначальной разблокировки)
+
+  unlocks PlayerModuleUnlock[]
+  files   TerminalFile[]
+}
+
+model PlayerModuleUnlock {
+  id         String        @id @default(cuid())
+  playerId   String
+  player     Player        @relation(fields: [playerId], references: [id])
+  moduleKey  String
+  module     CommandModule @relation(fields: [moduleKey], references: [key])
+  unlockedAt DateTime      @default(now())
+
+  @@unique([playerId, moduleKey])
+}
+
+// --- Файловая система терминала ---
+
+model TerminalFolder {
+  id            String  @id @default(cuid())
+  path          String  @unique // например "/ARCHIVE/TACTICAL"
+  name          String // отображаемое имя папки
+  parentPath    String?
+  visibleToRole Role? // null = видна всем ролям
+}
+
+model TerminalFile {
+  id                String        @id @default(cuid())
+  folderPath        String
+  filename          String // например "SITREP-004"
+  extension         String // например ".TAC", ".LOG", ".DAT", ".TXT"
+  requiredModuleKey String // модуль, необходимый для ПОЛНОГО открытия файла (например MAP_VIEWER)
+  requiredModule    CommandModule @relation(fields: [requiredModuleKey], references: [key])
+  fullContent       String // полный текст/контент, отдаётся только при открытии нужным модулем
+  analysisSummary   String // укороченный/искажённый вывод, который даёт FILE_ANALYZER независимо от наличия нужного модуля
+  visibleToRole     Role? // null = видим всем ролям
+
+  analyses PlayerFileAnalysis[]
+
+  @@index([folderPath])
+}
+
+model PlayerFileAnalysis {
+  id         String       @id @default(cuid())
+  playerId   String
+  player     Player       @relation(fields: [playerId], references: [id])
+  fileId     String
+  file       TerminalFile @relation(fields: [fileId], references: [id])
+  analyzedAt DateTime     @default(now())
+
+  @@unique([playerId, fileId])
 }
