@@ -29,6 +29,19 @@ async function main() {
       description: "Визуализация тактических карт (.TAC). Не реализован в MVP.",
       isDefault: false,
     },
+    {
+      key: "SEARCH",
+      name: "ПОИСК",
+      description: "Полнотекстовый поиск по архиву терминала. Не реализован в MVP.",
+      isDefault: false,
+    },
+    {
+      key: "MEMORY_MANAGER",
+      name: "МЕНЕДЖЕР ПАМЯТИ",
+      description:
+        "Диагностика и восстановление повреждённых секторов памяти. Не реализован в MVP.",
+      isDefault: false,
+    },
   ];
 
   for (const mod of modules) {
