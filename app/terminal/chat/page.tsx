@@ -1,21 +1,24 @@
 import { redirect } from "next/navigation";
-import { getCurrentPlayerId } from "@/lib/auth/server";
-import { ChatExitButton } from "./chat-exit-button";
+import { getCurrentPlayer } from "@/lib/auth/server";
+import { getOrCreateActiveSession } from "@/lib/chat/session";
+import { prisma } from "@/lib/db";
+import { ChatClient } from "./chat-client";
 
-// Полноценный диалоговый движок ИИ — предмет Фазы 4. Пока — заглушка экрана.
 export default async function ChatPage() {
-  const playerId = await getCurrentPlayerId();
-  if (!playerId) {
+  const player = await getCurrentPlayer();
+  if (!player) {
     redirect("/login");
   }
 
+  const session = await getOrCreateActiveSession(player.id);
+  const messages = await prisma.chatMessage.findMany({
+    where: { sessionId: session.id },
+    orderBy: { createdAt: "asc" },
+  });
+
   return (
-    <main className="flex min-h-screen flex-col gap-4 px-6 py-8 sm:px-12">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg">ДИАЛОГ С ИИ</h1>
-        <ChatExitButton />
-      </div>
-      <p className="opacity-70">МОДУЛЬ В РАЗРАБОТКЕ. [TODO: Фаза 4 — диалоговый движок ИИ]</p>
-    </main>
+    <ChatClient
+      initialMessages={messages.map((m) => ({ id: m.id, role: m.role, content: m.content }))}
+    />
   );
 }

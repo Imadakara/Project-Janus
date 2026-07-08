@@ -109,6 +109,21 @@ model TerminalFile {
   @@index([folderPath])
 }
 
+// --- Логирование вызовов LLM (для анализа стоимости/латентности) ---
+
+model LlmCallLog {
+  id           String   @id @default(cuid())
+  playerId     String
+  sessionId    String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  latencyMs    Int
+  createdAt    DateTime @default(now())
+
+  @@index([playerId])
+}
+
 model PlayerFileAnalysis {
   id         String       @id @default(cuid())
   playerId   String
