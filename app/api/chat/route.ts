@@ -5,7 +5,7 @@ import { getCurrentPlayer } from "@/lib/auth/server";
 import { getOrCreateActiveSession } from "@/lib/chat/session";
 import { getAnthropicClient, CHAT_MODEL } from "@/lib/ai/client";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
-import { isRateLimited } from "@/lib/ai/rate-limit";
+import { isChatRateLimited } from "@/lib/ai/rate-limit";
 import { trackEvent } from "@/lib/analytics/track";
 
 const HISTORY_LIMIT = 20;
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Требуется авторизация." }, { status: 401 });
   }
 
-  if (isRateLimited(player.id)) {
+  if (isChatRateLimited(player.id)) {
     return NextResponse.json({ error: "СЛИШКОМ МНОГО ЗАПРОСОВ. ПОДОЖДИТЕ." }, { status: 429 });
   }
 

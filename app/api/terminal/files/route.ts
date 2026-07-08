@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentPlayer } from "@/lib/auth/server";
 import { trackEvent } from "@/lib/analytics/track";
+import { isTerminalFilesRateLimited } from "@/lib/terminal/rate-limit";
 
 function normalizePath(raw: string | null): string {
   if (!raw || raw === "") return "/";
@@ -13,6 +14,10 @@ export async function GET(request: Request) {
   const player = await getCurrentPlayer();
   if (!player) {
     return NextResponse.json({ error: "Требуется авторизация." }, { status: 401 });
+  }
+
+  if (isTerminalFilesRateLimited(player.id)) {
+    return NextResponse.json({ error: "СЛИШКОМ МНОГО ЗАПРОСОВ. ПОДОЖДИТЕ." }, { status: 429 });
   }
 
   const { searchParams } = new URL(request.url);

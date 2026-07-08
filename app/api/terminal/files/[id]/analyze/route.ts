@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentPlayer } from "@/lib/auth/server";
 import { trackEvent } from "@/lib/analytics/track";
+import { getUnlockedModuleKeys } from "@/lib/modules/unlocks";
+import { hasModuleAccess } from "@/lib/modules/access";
+import { isTerminalFilesRateLimited } from "@/lib/terminal/rate-limit";
 
 const FILE_ANALYZER_KEY = "FILE_ANALYZER";
 
@@ -11,11 +14,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Требуется авторизация." }, { status: 401 });
   }
 
-  const analyzerUnlock = await prisma.playerModuleUnlock.findFirst({
-    where: { playerId: player.id, moduleKey: FILE_ANALYZER_KEY },
-  });
+  if (isTerminalFilesRateLimited(player.id)) {
+    return NextResponse.json({ error: "СЛИШКОМ МНОГО ЗАПРОСОВ. ПОДОЖДИТЕ." }, { status: 429 });
+  }
 
-  if (!analyzerUnlock) {
+  const unlockedModuleKeys = await getUnlockedModuleKeys(player.id);
+
+  if (!hasModuleAccess(unlockedModuleKeys, FILE_ANALYZER_KEY)) {
     return NextResponse.json(
       { error: "ДОСТУП ОТКЛОНЁН: ТРЕБУЕТСЯ МОДУЛЬ FILE_ANALYZER" },
       { status: 403 },
