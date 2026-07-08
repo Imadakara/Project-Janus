@@ -8,3 +8,10 @@ export function assignRandomRole(): Role {
   const index = Math.floor(Math.random() * ASSIGNABLE_ROLES.length);
   return ASSIGNABLE_ROLES[index];
 }
+
+export const ROLE_LABELS: Record<Role, string> = {
+  UNASSIGNED: "НЕ НАЗНАЧЕНА",
+  ARCHIVIST: "АРХИВИСТ",
+  TECHNICIAN: "ТЕХНИК",
+  SECURITY_OFFICER: "ОФИЦЕР БЕЗОПАСНОСТИ",
+};

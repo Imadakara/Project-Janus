@@ -25,7 +25,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.error ?? "Не удалось войти.");
+        setError(data?.error ?? "НЕ УДАЛОСЬ ВОЙТИ.");
         return;
       }
 
@@ -37,45 +37,48 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-4 text-neutral-100">
-      <div className="w-full max-w-sm rounded border border-neutral-700 bg-neutral-950 p-8">
-        <h1 className="mb-6 text-center text-xl font-semibold tracking-wide">ВХОД В ТЕРМИНАЛ</h1>
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm border p-8" style={{ borderColor: "var(--color-amber-dim)" }}>
+        <h1 className="mb-6 text-center text-xl tracking-wide">ВХОД В ТЕРМИНАЛ</h1>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            Email
+            EMAIL:
             <input
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded border border-neutral-700 bg-black px-3 py-2 text-neutral-100 outline-none focus:border-neutral-400"
+              className="border bg-transparent px-3 py-2 outline-none"
+              style={{ borderColor: "var(--color-amber-dim)" }}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Пароль
+            ПАРОЛЬ:
             <input
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded border border-neutral-700 bg-black px-3 py-2 text-neutral-100 outline-none focus:border-neutral-400"
+              className="border bg-transparent px-3 py-2 outline-none"
+              style={{ borderColor: "var(--color-amber-dim)" }}
             />
           </label>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm">{error}</p>}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 rounded bg-neutral-100 py-2 font-medium text-black transition hover:bg-neutral-300 disabled:opacity-50"
+            className="mt-2 border py-2 disabled:opacity-50"
+            style={{ borderColor: "var(--color-amber-dim)" }}
           >
-            {isSubmitting ? "Вход..." : "Войти"}
+            {isSubmitting ? "ВХОД..." : "ВОЙТИ"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-neutral-400">
-          Нет аккаунта?{" "}
-          <Link href="/register" className="text-neutral-100 underline">
-            Зарегистрироваться
+        <p className="mt-6 text-center text-sm opacity-70">
+          НЕТ АККАУНТА?{" "}
+          <Link href="/register" className="underline">
+            ЗАРЕГИСТРИРОВАТЬСЯ
           </Link>
         </p>
       </div>
