@@ -6,6 +6,7 @@ import { getOrCreateActiveSession } from "@/lib/chat/session";
 import { getAnthropicClient, CHAT_MODEL } from "@/lib/ai/client";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { isRateLimited } from "@/lib/ai/rate-limit";
+import { trackEvent } from "@/lib/analytics/track";
 
 const HISTORY_LIMIT = 20;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -90,6 +91,8 @@ export async function POST(request: Request) {
       latencyMs,
     },
   });
+
+  await trackEvent("CHAT_MESSAGE", player.id, { sessionId: session.id });
 
   return NextResponse.json({ sessionId: session.id, message: aiText });
 }

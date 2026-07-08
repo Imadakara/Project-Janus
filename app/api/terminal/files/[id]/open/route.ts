@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentPlayer } from "@/lib/auth/server";
+import { trackEvent } from "@/lib/analytics/track";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const player = await getCurrentPlayer();
@@ -23,6 +24,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   });
 
   if (!unlock) {
+    await trackEvent("FILE_OPEN_DENIED", player.id, {
+      fileId: file.id,
+      requiredModuleKey: file.requiredModuleKey,
+    });
     return NextResponse.json({
       granted: false,
       message: `ДОСТУП ОТКЛОНЁН: ТРЕБУЕТСЯ МОДУЛЬ ${file.requiredModule.key}`,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
+import { trackEvent } from "@/lib/analytics/track";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(255),
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
   if (!player || !passwordValid) {
     return NextResponse.json({ error: "Неверный email или пароль." }, { status: 401 });
   }
+
+  await trackEvent("LOGIN", player.id);
 
   const token = await createSessionToken({ playerId: player.id });
 

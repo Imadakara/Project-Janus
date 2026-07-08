@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { assignRandomRole } from "@/lib/auth/role";
 import { createSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
+import { trackEvent } from "@/lib/analytics/track";
 
 const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(255),
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
       },
     },
   });
+
+  await trackEvent("REGISTER", player.id, { role: player.role });
 
   const token = await createSessionToken({ playerId: player.id });
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentPlayer } from "@/lib/auth/server";
+import { trackEvent } from "@/lib/analytics/track";
 
 function normalizePath(raw: string | null): string {
   if (!raw || raw === "") return "/";
@@ -40,6 +41,8 @@ export async function GET(request: Request) {
       orderBy: { filename: "asc" },
     }),
   ]);
+
+  await trackEvent("FILE_MANAGER_OPENED", player.id, { path });
 
   return NextResponse.json({
     path,

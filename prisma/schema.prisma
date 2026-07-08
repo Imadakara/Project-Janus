@@ -21,6 +21,7 @@ model Player {
   chatSessions  ChatSession[]
   moduleUnlocks PlayerModuleUnlock[]
   fileAnalyses  PlayerFileAnalysis[]
+  events        Event[]
 }
 
 enum Role {
@@ -133,4 +134,18 @@ model PlayerFileAnalysis {
   analyzedAt DateTime     @default(now())
 
   @@unique([playerId, fileId])
+}
+
+// --- Аналитика MVP ---
+
+model Event {
+  id        String   @id @default(cuid())
+  playerId  String?
+  player    Player?  @relation(fields: [playerId], references: [id])
+  type      String // REGISTER, LOGIN, CHAT_MESSAGE, FILE_MANAGER_OPENED, FILE_ANALYZED, FILE_OPEN_DENIED
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([playerId])
+  @@index([type])
 }

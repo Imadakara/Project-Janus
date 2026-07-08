@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentPlayer } from "@/lib/auth/server";
+import { trackEvent } from "@/lib/analytics/track";
 
 const FILE_ANALYZER_KEY = "FILE_ANALYZER";
 
@@ -33,6 +34,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     create: { playerId: player.id, fileId: file.id },
     update: { analyzedAt: new Date() },
   });
+
+  await trackEvent("FILE_ANALYZED", player.id, { fileId: file.id });
 
   return NextResponse.json({ summary: file.analysisSummary });
 }
