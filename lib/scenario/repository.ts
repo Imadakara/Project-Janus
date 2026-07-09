@@ -24,7 +24,9 @@ export async function loadFragmentsForIntent(
   const result: FragmentsByPoolType = { NORMAL: [], REPEATED: [] };
 
   for (const type of ["NORMAL", "REPEATED"] as const) {
-    const roleSpecific = pools.find((pool) => pool.type === type && pool.requiredRole === playerRole);
+    const roleSpecific = pools.find(
+      (pool) => pool.type === type && pool.requiredRole === playerRole,
+    );
     const generic = pools.find((pool) => pool.type === type && pool.requiredRole === null);
     const chosen = roleSpecific ?? generic;
     if (chosen) result[type] = chosen.fragments.map((fragment) => fragment.template);

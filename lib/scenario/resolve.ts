@@ -48,8 +48,13 @@ export type ResolveInput = {
 };
 
 export function resolveResponse(input: ResolveInput): ResolveOutput {
-  const { intentResult, sessionState, requiresSynthesis, fullLlmBudgetExceeded, fragmentsByPoolType } =
-    input;
+  const {
+    intentResult,
+    sessionState,
+    requiresSynthesis,
+    fullLlmBudgetExceeded,
+    fragmentsByPoolType,
+  } = input;
 
   const disposition = applyDispositionDelta(sessionState.disposition, intentResult.tags);
   const { desyncScore, lastConfidenceTier } = calculateDesyncScore(
@@ -69,7 +74,10 @@ export function resolveResponse(input: ResolveInput): ResolveOutput {
     intentRepeatCount,
     desyncScore,
     lastConfidenceTier,
-    shortTermMemory: nextShortTermMemory(sessionState.shortTermMemory, intentResult.mentionedEntities),
+    shortTermMemory: nextShortTermMemory(
+      sessionState.shortTermMemory,
+      intentResult.mentionedEntities,
+    ),
   };
 
   const fewShotExamples = fragmentsByPoolType?.NORMAL ?? [];

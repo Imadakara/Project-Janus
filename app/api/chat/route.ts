@@ -55,7 +55,9 @@ export async function POST(request: Request) {
     lastConfidenceTier: session.lastConfidenceTier as ScenarioSessionState["lastConfidenceTier"],
   };
 
-  const intentResult = await classifyIntent(playerMessage, { shortTermMemory: sessionState.shortTermMemory });
+  const intentResult = await classifyIntent(playerMessage, {
+    shortTermMemory: sessionState.shortTermMemory,
+  });
 
   // MVP-эвристика: считаем, что запрос требует синтеза нескольких материалов, если
   // сообщение упоминает 2+ известных сущности сразу. TODO: заменить реальной сверкой с
@@ -80,8 +82,12 @@ export async function POST(request: Request) {
   let aiText: string;
   let handledByLayer: MessageLayer;
   let escalationReason: string | null = null;
-  let llmUsage: { inputTokens: number; outputTokens: number; model: string; latencyMs: number } | null =
-    null;
+  let llmUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    model: string;
+    latencyMs: number;
+  } | null = null;
 
   try {
     if (resolution.kind === "deterministic") {
@@ -111,10 +117,15 @@ export async function POST(request: Request) {
           take: HISTORY_LIMIT,
         }),
       ]);
-      const ragResults = await searchUnlockedMaterials(playerMessage, unlockedModuleKeys, player.role);
-      const history = recentHistory
-        .reverse()
-        .map((m) => ({ role: m.role === "PLAYER" ? ("user" as const) : ("assistant" as const), content: m.content }));
+      const ragResults = await searchUnlockedMaterials(
+        playerMessage,
+        unlockedModuleKeys,
+        player.role,
+      );
+      const history = recentHistory.reverse().map((m) => ({
+        role: m.role === "PLAYER" ? ("user" as const) : ("assistant" as const),
+        content: m.content,
+      }));
 
       const prompt = buildPrompt(resolution.task, {
         mode: "full",

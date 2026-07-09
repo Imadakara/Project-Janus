@@ -143,7 +143,11 @@ async function main() {
     const pool = existingPool
       ? existingPool
       : await prisma.responsePool.create({
-          data: { intentId, type: poolDef.type as ResponsePoolType, requiredRole: poolRequiredRole },
+          data: {
+            intentId,
+            type: poolDef.type as ResponsePoolType,
+            requiredRole: poolRequiredRole,
+          },
         });
     poolCount += 1;
 

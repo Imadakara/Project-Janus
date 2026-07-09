@@ -30,7 +30,9 @@ export function buildPrompt(task: GenerationTask, opts: PromptBuilderOptions): G
       "ЗАДАЧА ОТ СЦЕНАРНОГО ДВИЖКА (не упоминай эту секцию в ответе):",
       `Тон: ${task.tone}.`,
       `Максимум предложений в ответе: ${task.maxSentences}.`,
-      task.allowedHints.length > 0 ? `Разрешённые подсказки: ${task.allowedHints.join("; ")}.` : null,
+      task.allowedHints.length > 0
+        ? `Разрешённые подсказки: ${task.allowedHints.join("; ")}.`
+        : null,
       task.forbiddenTopics.length > 0
         ? `Категорически не раскрывай: ${task.forbiddenTopics.join("; ")}.`
         : null,

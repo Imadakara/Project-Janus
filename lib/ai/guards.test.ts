@@ -22,7 +22,10 @@ describe("applyGuards", () => {
 
   it("replaces the whole response with a deflection when a forbidden topic is mentioned", () => {
     const text = "Пароль доступа хранится в секторе B.";
-    const result = applyGuards(text, task({ forbiddenTopics: ["пароль доступа"], maxSentences: 5 }));
+    const result = applyGuards(
+      text,
+      task({ forbiddenTopics: ["пароль доступа"], maxSentences: 5 }),
+    );
     expect(result).not.toContain("сектор");
     expect(result.length).toBeGreaterThan(0);
   });

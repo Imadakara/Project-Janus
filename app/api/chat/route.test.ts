@@ -171,7 +171,13 @@ describe("POST /api/chat", () => {
   it("calls the LLM provider in light mode without fetching history/RAG", async () => {
     mockResolveResponse.mockReturnValue({
       kind: "light_llm",
-      task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 2,
+        fewShotExamples: [],
+      },
       stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
       escalationReason: "desync_light",
     });
@@ -189,7 +195,13 @@ describe("POST /api/chat", () => {
   it("calls the LLM provider in full mode with history and RAG results", async () => {
     mockResolveResponse.mockReturnValue({
       kind: "full_llm",
-      task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 4, fewShotExamples: [] },
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 4,
+        fewShotExamples: [],
+      },
       stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
       escalationReason: "desync_full",
     });
@@ -221,7 +233,13 @@ describe("POST /api/chat", () => {
   it("returns 502 when the LLM provider call fails", async () => {
     mockResolveResponse.mockReturnValue({
       kind: "light_llm",
-      task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 2,
+        fewShotExamples: [],
+      },
       stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
       escalationReason: "desync_light",
     });

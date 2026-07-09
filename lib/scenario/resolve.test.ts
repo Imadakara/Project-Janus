@@ -116,10 +116,13 @@ describe("resolveResponse — desyncScore escalation", () => {
   });
 
   it("resets desyncScore to 0 and returns to the deterministic path on a confident match", () => {
-    let sessionState = baseSessionState({ desyncScore: 5, lastConfidenceTier: "low" });
+    const sessionState = baseSessionState({ desyncScore: 5, lastConfidenceTier: "low" });
 
     const result = resolveResponse(
-      baseInput({ sessionState, intentResult: { intent: "ASK_IDENTITY", confidence: 0.95, tags: [], mentionedEntities: [] } }),
+      baseInput({
+        sessionState,
+        intentResult: { intent: "ASK_IDENTITY", confidence: 0.95, tags: [], mentionedEntities: [] },
+      }),
     );
 
     expect(result.kind).toBe("deterministic");
