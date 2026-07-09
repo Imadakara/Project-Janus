@@ -87,11 +87,16 @@ async function main() {
       visibleToRole: file.visibleToRole as Role | null,
     };
 
-    if (existing) {
-      await prisma.terminalFile.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.terminalFile.create({ data });
-    }
+    const terminalFile = existing
+      ? await prisma.terminalFile.update({ where: { id: existing.id }, data })
+      : await prisma.terminalFile.create({ data });
+
+    // RAG-фоллбэк Слоя 3 (lib/ai/rag.ts) ищет по этому эмбеддингу — считается один раз
+    // при сиде, не в рантайме.
+    const fileVector = await embedText(file.fullContent);
+    await prisma.$executeRaw`
+      UPDATE "TerminalFile" SET embedding = ${toVectorLiteral(fileVector)}::vector WHERE id = ${terminalFile.id}
+    `;
   }
 
   // --- Гибридный диалоговый движок: intent'ы, эталонные фразы, пулы ответов ---
