@@ -1,7 +1,10 @@
 import "dotenv/config";
 import { prisma } from "@/lib/db";
 import seedFiles from "@/content/seed-files.json";
-import type { Role } from "@/app/generated/prisma/client";
+import intentsData from "@/content/intents.json";
+import responsePoolsData from "@/content/response-pools.json";
+import { embedText, toVectorLiteral } from "@/lib/embeddings/client";
+import type { Role, ResponsePoolType } from "@/app/generated/prisma/client";
 
 async function main() {
   const modules = [
@@ -91,8 +94,66 @@ async function main() {
     }
   }
 
+  // --- Гибридный диалоговый движок: intent'ы, эталонные фразы, пулы ответов ---
+
+  const intentIdByCode = new Map<string, string>();
+
+  for (const intentDef of intentsData.intents) {
+    const intent = await prisma.intent.upsert({
+      where: { code: intentDef.code },
+      create: { code: intentDef.code, description: intentDef.description },
+      update: { description: intentDef.description },
+    });
+    intentIdByCode.set(intentDef.code, intent.id);
+
+    for (const phrase of intentDef.examples) {
+      const example = await prisma.intentExample.upsert({
+        where: { intentId_phrase: { intentId: intent.id, phrase } },
+        create: { intentId: intent.id, phrase },
+        update: {},
+      });
+
+      const vector = await embedText(phrase);
+      await prisma.$executeRaw`
+        UPDATE "IntentExample" SET embedding = ${toVectorLiteral(vector)}::vector WHERE id = ${example.id}
+      `;
+    }
+  }
+
+  let poolCount = 0;
+  let fragmentCount = 0;
+
+  for (const poolDef of responsePoolsData.pools) {
+    const intentId = intentIdByCode.get(poolDef.intentCode);
+    if (!intentId) {
+      throw new Error(`response-pools.json ссылается на неизвестный intent: ${poolDef.intentCode}`);
+    }
+
+    // Prisma не даёт использовать null внутри composite-unique where (requiredRole
+    // nullable) — ищем и создаём/обновляем вручную, как для TerminalFile выше.
+    const poolRequiredRole = poolDef.requiredRole as Role | null;
+    const existingPool = await prisma.responsePool.findFirst({
+      where: { intentId, type: poolDef.type as ResponsePoolType, requiredRole: poolRequiredRole },
+    });
+    const pool = existingPool
+      ? existingPool
+      : await prisma.responsePool.create({
+          data: { intentId, type: poolDef.type as ResponsePoolType, requiredRole: poolRequiredRole },
+        });
+    poolCount += 1;
+
+    // ResponseFragment не имеет естественного ключа — пересобираем содержимое пула
+    // из JSON при каждом запуске сида (это чистый контент без зависимой истории).
+    await prisma.responseFragment.deleteMany({ where: { poolId: pool.id } });
+    await prisma.responseFragment.createMany({
+      data: poolDef.fragments.map((template) => ({ poolId: pool.id, template })),
+    });
+    fragmentCount += poolDef.fragments.length;
+  }
+
   console.log(
-    `Seed complete: ${modules.length} modules, ${seedFiles.folders.length} folders, ${seedFiles.files.length} files.`,
+    `Seed complete: ${modules.length} modules, ${seedFiles.folders.length} folders, ${seedFiles.files.length} files, ` +
+      `${intentsData.intents.length} intents, ${poolCount} response pools, ${fragmentCount} fragments.`,
   );
 }
 
