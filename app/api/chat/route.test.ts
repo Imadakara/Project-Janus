@@ -230,6 +230,51 @@ describe("POST /api/chat", () => {
     );
   });
 
+  it("omits the debug field entirely for a non-debug player", async () => {
+    mockResolveResponse.mockReturnValue({
+      kind: "deterministic",
+      fragment: "детерминированный ответ",
+      stateUpdate: STATE_UPDATE,
+    });
+
+    const res = await POST(makeRequest("Кто ты?"));
+    const data = await res.json();
+
+    expect("debug" in data).toBe(false);
+  });
+
+  it("includes layer/intent/session debug info for a debug player", async () => {
+    mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+    mockResolveResponse.mockReturnValue({
+      kind: "light_llm",
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 2,
+        fewShotExamples: [],
+      },
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+      escalationReason: "desync_light",
+    });
+
+    const res = await POST(makeRequest("бла бла бла"));
+    const data = await res.json();
+
+    expect(data.debug).toEqual({
+      handledByLayer: "LIGHT_LLM",
+      matchedIntent: INTENT_RESULT.intent,
+      intentConfidence: INTENT_RESULT.confidence,
+      escalationReason: "desync_light",
+      session: {
+        desyncScore: 3,
+        lastConfidenceTier: "low",
+        disposition: STATE_UPDATE.disposition,
+        activeContext: SESSION.activeContext,
+      },
+    });
+  });
+
   it("returns 502 when the LLM provider call fails", async () => {
     mockResolveResponse.mockReturnValue({
       kind: "light_llm",

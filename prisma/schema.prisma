@@ -19,6 +19,7 @@ model Player {
   role         Role     @default(UNASSIGNED)
   createdAt    DateTime @default(now())
   trustLevel   Int      @default(0) // уровень доверия ИИ к игроку, задел на будущее
+  isDebug      Boolean  @default(false) // показывает панель отладки гибридного движка в /terminal/chat
 
   chatSessions  ChatSession[]
   moduleUnlocks PlayerModuleUnlock[]

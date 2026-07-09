@@ -3,13 +3,41 @@
 import { useRef, useState, type FormEvent } from "react";
 import { ChatExitButton } from "./chat-exit-button";
 
-type Message = { id: string; role: "PLAYER" | "AI"; content: string };
+type MessageLayer = "DETERMINISTIC" | "LIGHT_LLM" | "FULL_LLM";
+type ConfidenceTier = "high" | "medium" | "low";
 
-export function ChatClient({ initialMessages }: { initialMessages: Message[] }) {
+type Message = {
+  id: string;
+  role: "PLAYER" | "AI";
+  content: string;
+  handledByLayer?: MessageLayer | null;
+  matchedIntent?: string | null;
+  intentConfidence?: number | null;
+  escalationReason?: string | null;
+};
+
+type SessionDebug = {
+  desyncScore: number;
+  lastConfidenceTier: ConfidenceTier | null;
+  disposition: { trust: number; tension: number };
+  activeContext: string | null;
+};
+
+export function ChatClient({
+  initialMessages,
+  isDebugUser = false,
+  initialSessionDebug = null,
+}: {
+  initialMessages: Message[];
+  isDebugUser?: boolean;
+  initialSessionDebug?: SessionDebug | null;
+}) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionDebug, setSessionDebug] = useState<SessionDebug | null>(initialSessionDebug);
+  const [showDebug, setShowDebug] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   async function handleSubmit(event: FormEvent) {
@@ -40,8 +68,20 @@ export function ChatClient({ initialMessages }: { initialMessages: Message[] }) 
 
       setMessages((prev) => [
         ...prev,
-        { id: `ai-${Date.now()}`, role: "AI", content: data.message },
+        {
+          id: `ai-${Date.now()}`,
+          role: "AI",
+          content: data.message,
+          handledByLayer: data.debug?.handledByLayer ?? null,
+          matchedIntent: data.debug?.matchedIntent ?? null,
+          intentConfidence: data.debug?.intentConfidence ?? null,
+          escalationReason: data.debug?.escalationReason ?? null,
+        },
       ]);
+
+      if (data.debug?.session) {
+        setSessionDebug(data.debug.session);
+      }
     } catch {
       setError("ОШИБКА СВЯЗИ.");
     } finally {
@@ -56,8 +96,58 @@ export function ChatClient({ initialMessages }: { initialMessages: Message[] }) 
     <main className="flex min-h-screen flex-col gap-4 px-6 py-8 sm:px-12">
       <div className="flex items-center justify-between">
         <h1 className="text-lg">ДИАЛОГ С ИИ</h1>
-        <ChatExitButton />
+        <div className="flex gap-2">
+          {isDebugUser && (
+            <button
+              type="button"
+              onClick={() => setShowDebug((v) => !v)}
+              className="border px-3 py-1 text-sm"
+              style={{ borderColor: "var(--color-amber-dim)" }}
+            >
+              {showDebug ? "СКРЫТЬ ДЕБАГ" : "ДЕБАГ"}
+            </button>
+          )}
+          <ChatExitButton />
+        </div>
       </div>
+
+      {isDebugUser && showDebug && (
+        <div
+          className="flex flex-col gap-2 border p-4 text-sm"
+          style={{ borderColor: "var(--color-amber-dim)" }}
+        >
+          <p className="opacity-70">— СОСТОЯНИЕ ДВИЖКА —</p>
+          {sessionDebug ? (
+            <>
+              <p>DESYNC SCORE: {sessionDebug.desyncScore}</p>
+              <p>CONFIDENCE TIER: {sessionDebug.lastConfidenceTier ?? "—"}</p>
+              <p>
+                DISPOSITION: trust={sessionDebug.disposition.trust}, tension=
+                {sessionDebug.disposition.tension}
+              </p>
+              <p>ACTIVE CONTEXT: {sessionDebug.activeContext ?? "—"}</p>
+            </>
+          ) : (
+            <p className="opacity-70">Нет данных сессии.</p>
+          )}
+
+          <p className="mt-2 opacity-70">— ИСТОРИЯ ХОДОВ ИИ —</p>
+          <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+            {messages.filter((m) => m.role === "AI" && m.handledByLayer).length === 0 && (
+              <p className="opacity-70">Пока нет ответов ИИ в этой сессии.</p>
+            )}
+            {messages
+              .filter((m) => m.role === "AI" && m.handledByLayer)
+              .map((m) => (
+                <p key={m.id} className="opacity-90">
+                  [{m.handledByLayer}] intent={m.matchedIntent ?? "—"} conf=
+                  {m.intentConfidence != null ? m.intentConfidence.toFixed(2) : "—"} escalation=
+                  {m.escalationReason ?? "—"}
+                </p>
+              ))}
+          </div>
+        </div>
+      )}
 
       <div
         ref={listRef}

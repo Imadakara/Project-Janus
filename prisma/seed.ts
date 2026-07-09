@@ -4,7 +4,11 @@ import seedFiles from "@/content/seed-files.json";
 import intentsData from "@/content/intents.json";
 import responsePoolsData from "@/content/response-pools.json";
 import { embedText, toVectorLiteral } from "@/lib/embeddings/client";
+import { hashPassword } from "@/lib/auth/password";
 import type { Role, ResponsePoolType } from "@/app/generated/prisma/client";
+
+const DEBUG_PLAYER_EMAIL = "test@example.com";
+const DEBUG_PLAYER_PASSWORD = "testpassword123";
 
 async function main() {
   const modules = [
@@ -52,6 +56,28 @@ async function main() {
       where: { key: mod.key },
       create: mod,
       update: mod,
+    });
+  }
+
+  // --- Тестовый дебаг-аккаунт (панель отладки гибридного движка в /terminal/chat) ---
+  const existingDebugPlayer = await prisma.player.findUnique({
+    where: { email: DEBUG_PLAYER_EMAIL },
+  });
+  if (existingDebugPlayer) {
+    await prisma.player.update({
+      where: { id: existingDebugPlayer.id },
+      data: { isDebug: true },
+    });
+  } else {
+    const defaultModuleKeys = modules.filter((mod) => mod.isDefault).map((mod) => mod.key);
+    await prisma.player.create({
+      data: {
+        email: DEBUG_PLAYER_EMAIL,
+        passwordHash: await hashPassword(DEBUG_PLAYER_PASSWORD),
+        role: "ARCHIVIST",
+        isDebug: true,
+        moduleUnlocks: { create: defaultModuleKeys.map((moduleKey) => ({ moduleKey })) },
+      },
     });
   }
 
@@ -162,7 +188,8 @@ async function main() {
 
   console.log(
     `Seed complete: ${modules.length} modules, ${seedFiles.folders.length} folders, ${seedFiles.files.length} files, ` +
-      `${intentsData.intents.length} intents, ${poolCount} response pools, ${fragmentCount} fragments.`,
+      `${intentsData.intents.length} intents, ${poolCount} response pools, ${fragmentCount} fragments, ` +
+      `debug account ${DEBUG_PLAYER_EMAIL}.`,
   );
 }
 

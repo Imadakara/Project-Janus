@@ -185,5 +185,20 @@ export async function POST(request: Request) {
 
   await trackEvent("CHAT_MESSAGE", player.id, { sessionId: session.id });
 
-  return NextResponse.json({ sessionId: session.id, message: aiText });
+  const debug = player.isDebug
+    ? {
+        handledByLayer,
+        matchedIntent: intentResult.intent,
+        intentConfidence: intentResult.confidence,
+        escalationReason,
+        session: {
+          desyncScore: resolution.stateUpdate.desyncScore,
+          lastConfidenceTier: resolution.stateUpdate.lastConfidenceTier,
+          disposition: resolution.stateUpdate.disposition,
+          activeContext: sessionState.activeContext,
+        },
+      }
+    : undefined;
+
+  return NextResponse.json({ sessionId: session.id, message: aiText, debug });
 }
