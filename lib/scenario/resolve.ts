@@ -9,7 +9,7 @@ import { nextRepeatCount, shouldUseRepeatedPool } from "./intent-repeat";
 import { nextShortTermMemory } from "./memory";
 import type { FragmentsByPoolType } from "./repository";
 import { DESYNC_FULL_LLM_MIN, DESYNC_LIGHT_LLM_MIN } from "./thresholds";
-import type { ResolveStateUpdate, ScenarioSessionState } from "./types";
+import type { EscalationReason, ResolveStateUpdate, ScenarioSessionState } from "./types";
 
 // Заглушки на случай, когда intent не распознан вовсе (нет ResponsePool для null) или
 // когда бюджет full_llm исчерпан — фиксированный внутриигровой отказ вместо тихого
@@ -22,18 +22,23 @@ const BUDGET_REFUSAL_FRAGMENTS = [
 ];
 
 export type ResolveOutput =
-  | { kind: "deterministic"; fragment: string; stateUpdate: ResolveStateUpdate }
+  | {
+      kind: "deterministic";
+      fragment: string;
+      stateUpdate: ResolveStateUpdate;
+      escalationReason?: EscalationReason;
+    }
   | {
       kind: "light_llm";
       task: GenerationTask;
       stateUpdate: ResolveStateUpdate;
-      escalationReason: string;
+      escalationReason: EscalationReason;
     }
   | {
       kind: "full_llm";
       task: GenerationTask;
       stateUpdate: ResolveStateUpdate;
-      escalationReason: string;
+      escalationReason: EscalationReason;
     };
 
 export type ResolveInput = {
@@ -88,6 +93,7 @@ export function resolveResponse(input: ResolveInput): ResolveOutput {
         kind: "deterministic",
         fragment: pickFragment(BUDGET_REFUSAL_FRAGMENTS),
         stateUpdate,
+        escalationReason: "desync_full_budget_exceeded",
       };
     }
     return {

@@ -7,6 +7,17 @@
   --color-amber-bright: #ffd23f;
   --color-amber-dim: #8a5c00;
   --color-amber-faint: #4d3300;
+
+  /* Панель отладки — намеренно вне янтарной CRT-темы терминала: нейтральный серый, без
+     тематического акцента, чтобы читаться как инструмент тестировщика поверх сайта, а не
+     часть игрового UI. */
+  --color-debug-bg: #262626;
+  --color-debug-bg-raised: #333333;
+  --color-debug-border: #595959;
+  --color-debug-text: #e6e6e6;
+  --color-debug-text-muted: #a6a6a6;
+  --color-debug-backdrop: rgba(0, 0, 0, 0.6);
+  --font-debug: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
 }
 
 @theme inline {
@@ -120,4 +131,32 @@ textarea {
   .crt-cursor {
     animation: none;
   }
+}
+
+/* --- Панель отладки (сайт-wide, вне CRT-темы) --- */
+
+.debug-panel-trigger {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 101;
+  font-family: var(--font-debug);
+  text-shadow: none;
+}
+
+.debug-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: var(--color-debug-backdrop);
+}
+
+.debug-panel-window {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  font-family: var(--font-debug);
+  text-shadow: none;
 }

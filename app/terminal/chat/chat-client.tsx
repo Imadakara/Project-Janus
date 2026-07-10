@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChatExitButton } from "./chat-exit-button";
+import { useDebug, type AiTurnLogEntry, type SessionDebugState } from "@/lib/debug/debug-context";
+import { formatTurnTag, isBlockedByToggle } from "@/lib/scenario/debug-explain";
+import type { EscalationReason } from "@/lib/scenario/types";
 
 type MessageLayer = "DETERMINISTIC" | "LIGHT_LLM" | "FULL_LLM";
-type ConfidenceTier = "high" | "medium" | "low";
 
 type Message = {
   id: string;
@@ -14,13 +16,9 @@ type Message = {
   matchedIntent?: string | null;
   intentConfidence?: number | null;
   escalationReason?: string | null;
-};
-
-type SessionDebug = {
-  desyncScore: number;
-  lastConfidenceTier: ConfidenceTier | null;
-  disposition: { trust: number; tension: number };
-  activeContext: string | null;
+  // Известен только для ходов, полученных в текущей живой сессии (не персистится по-сообщённо
+  // в БД) — см. lib/scenario/debug-explain.ts.
+  desyncScore?: number | null;
 };
 
 export function ChatClient({
@@ -30,15 +28,43 @@ export function ChatClient({
 }: {
   initialMessages: Message[];
   isDebugUser?: boolean;
-  initialSessionDebug?: SessionDebug | null;
+  initialSessionDebug?: SessionDebugState | null;
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionDebug, setSessionDebug] = useState<SessionDebug | null>(initialSessionDebug);
-  const [showDebug, setShowDebug] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const { useLlm, setSessionDebug, pushAiTurn, seedAiTurnLog, registerClearChatHandler } =
+    useDebug();
+
+  // Засеиваем контекст панели отладки уже существующей историей — иначе после F5 лог пуст
+  // до следующего хода. Один раз при монтировании.
+  useEffect(() => {
+    if (!isDebugUser) return;
+    if (initialSessionDebug) {
+      setSessionDebug(initialSessionDebug);
+    }
+    const entries: AiTurnLogEntry[] = initialMessages
+      .filter((m) => m.role === "AI" && m.handledByLayer)
+      .map((m) => ({
+        id: m.id,
+        handledByLayer: m.handledByLayer as MessageLayer,
+        matchedIntent: m.matchedIntent ?? null,
+        intentConfidence: m.intentConfidence ?? null,
+        escalationReason: m.escalationReason ?? null,
+        desyncScore: m.desyncScore ?? null,
+      }));
+    if (entries.length > 0) {
+      seedAiTurnLog(entries);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    registerClearChatHandler(() => setMessages([]));
+    return () => registerClearChatHandler(null);
+  }, [registerClearChatHandler]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,7 +83,7 @@ export function ChatClient({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, useLlm }),
       });
       const data = await res.json();
 
@@ -66,21 +92,31 @@ export function ChatClient({
         return;
       }
 
+      const aiMessageId = `ai-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
         {
-          id: `ai-${Date.now()}`,
+          id: aiMessageId,
           role: "AI",
           content: data.message,
           handledByLayer: data.debug?.handledByLayer ?? null,
           matchedIntent: data.debug?.matchedIntent ?? null,
           intentConfidence: data.debug?.intentConfidence ?? null,
           escalationReason: data.debug?.escalationReason ?? null,
+          desyncScore: data.debug?.session?.desyncScore ?? null,
         },
       ]);
 
-      if (data.debug?.session) {
+      if (data.debug) {
         setSessionDebug(data.debug.session);
+        pushAiTurn({
+          id: aiMessageId,
+          handledByLayer: data.debug.handledByLayer,
+          matchedIntent: data.debug.matchedIntent,
+          intentConfidence: data.debug.intentConfidence,
+          escalationReason: data.debug.escalationReason,
+          desyncScore: data.debug.session?.desyncScore ?? null,
+        });
       }
     } catch {
       setError("ОШИБКА СВЯЗИ.");
@@ -96,58 +132,8 @@ export function ChatClient({
     <main className="flex min-h-screen flex-col gap-4 px-6 py-8 sm:px-12">
       <div className="flex items-center justify-between">
         <h1 className="text-lg">ДИАЛОГ С ИИ</h1>
-        <div className="flex gap-2">
-          {isDebugUser && (
-            <button
-              type="button"
-              onClick={() => setShowDebug((v) => !v)}
-              className="border px-3 py-1 text-sm"
-              style={{ borderColor: "var(--color-amber-dim)" }}
-            >
-              {showDebug ? "СКРЫТЬ ДЕБАГ" : "ДЕБАГ"}
-            </button>
-          )}
-          <ChatExitButton />
-        </div>
+        <ChatExitButton />
       </div>
-
-      {isDebugUser && showDebug && (
-        <div
-          className="flex flex-col gap-2 border p-4 text-sm"
-          style={{ borderColor: "var(--color-amber-dim)" }}
-        >
-          <p className="opacity-70">— СОСТОЯНИЕ ДВИЖКА —</p>
-          {sessionDebug ? (
-            <>
-              <p>DESYNC SCORE: {sessionDebug.desyncScore}</p>
-              <p>CONFIDENCE TIER: {sessionDebug.lastConfidenceTier ?? "—"}</p>
-              <p>
-                DISPOSITION: trust={sessionDebug.disposition.trust}, tension=
-                {sessionDebug.disposition.tension}
-              </p>
-              <p>ACTIVE CONTEXT: {sessionDebug.activeContext ?? "—"}</p>
-            </>
-          ) : (
-            <p className="opacity-70">Нет данных сессии.</p>
-          )}
-
-          <p className="mt-2 opacity-70">— ИСТОРИЯ ХОДОВ ИИ —</p>
-          <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
-            {messages.filter((m) => m.role === "AI" && m.handledByLayer).length === 0 && (
-              <p className="opacity-70">Пока нет ответов ИИ в этой сессии.</p>
-            )}
-            {messages
-              .filter((m) => m.role === "AI" && m.handledByLayer)
-              .map((m) => (
-                <p key={m.id} className="opacity-90">
-                  [{m.handledByLayer}] intent={m.matchedIntent ?? "—"} conf=
-                  {m.intentConfidence != null ? m.intentConfidence.toFixed(2) : "—"} escalation=
-                  {m.escalationReason ?? "—"}
-                </p>
-              ))}
-          </div>
-        </div>
-      )}
 
       <div
         ref={listRef}
@@ -155,12 +141,39 @@ export function ChatClient({
         style={{ borderColor: "var(--color-amber-dim)" }}
       >
         {messages.length === 0 && <p className="opacity-70">СОЕДИНЕНИЕ ОЖИДАЕТ ВВОДА...</p>}
-        {messages.map((m) => (
-          <p key={m.id} className="whitespace-pre-wrap">
-            <span className="opacity-70">{m.role === "PLAYER" ? "> " : "ЯНУС> "}</span>
-            {m.content}
-          </p>
-        ))}
+        {messages.map((m) => {
+          // Дебажная реплика (см. п.5/п.4 задачи): в основном тексте уже содержится вся
+          // диагностика, если движок LLM был заблокирован тумблером — дублировать нечем.
+          const showDebugAnnotation =
+            isDebugUser &&
+            m.role === "AI" &&
+            !!m.handledByLayer &&
+            !isBlockedByToggle(m.escalationReason);
+
+          return (
+            <div key={m.id}>
+              <p className="whitespace-pre-wrap">
+                <span className="opacity-70">{m.role === "PLAYER" ? "> " : "ЯНУС> "}</span>
+                {m.content}
+              </p>
+              {showDebugAnnotation && (
+                <p
+                  className="mt-1 text-xs whitespace-pre-wrap"
+                  style={{ color: "var(--color-debug-text)" }}
+                >
+                  [DEBUG]{" "}
+                  {formatTurnTag({
+                    handledByLayer: m.handledByLayer as MessageLayer,
+                    matchedIntent: m.matchedIntent ?? null,
+                    intentConfidence: m.intentConfidence ?? null,
+                    escalationReason: (m.escalationReason ?? null) as EscalationReason | null,
+                    desyncScore: m.desyncScore ?? null,
+                  })}
+                </p>
+              )}
+            </div>
+          );
+        })}
         {isSending && <p className="opacity-70">ЯНУС ОБРАБАТЫВАЕТ ЗАПРОС...</p>}
       </div>
 

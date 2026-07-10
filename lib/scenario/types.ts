@@ -19,3 +19,13 @@ export type ResolveStateUpdate = Pick<
   ScenarioSessionState,
   "disposition" | "intentRepeatCount" | "desyncScore" | "lastConfidenceTier" | "shortTermMemory"
 >;
+
+// Причины эскалации до Слоя 3, персистятся в ChatMessage.escalationReason (String?) — новые
+// значения не требуют миграции БД. См. lib/scenario/debug-explain.ts для их использования в
+// панели отладки.
+export type EscalationReason =
+  | "desync_light"
+  | "desync_full"
+  | "desync_full_budget_exceeded"
+  | "desync_light_blocked_toggle"
+  | "desync_full_blocked_toggle";

@@ -139,6 +139,7 @@ describe("resolveResponse — desyncScore escalation", () => {
     expect(result.kind).toBe("deterministic");
     if (result.kind === "deterministic") {
       expect(result.fragment).toContain("перегружен");
+      expect(result.escalationReason).toBe("desync_full_budget_exceeded");
     }
   });
 });

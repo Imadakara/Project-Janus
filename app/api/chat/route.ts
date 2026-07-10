@@ -13,7 +13,12 @@ import { trackEvent } from "@/lib/analytics/track";
 import { classifyIntent } from "@/lib/intent/classify";
 import { resolveResponse, type ResolveInput } from "@/lib/scenario/resolve";
 import { loadFragmentsForIntent } from "@/lib/scenario/repository";
-import type { ScenarioSessionState, ShortTermMemoryEntry } from "@/lib/scenario/types";
+import type {
+  EscalationReason,
+  ScenarioSessionState,
+  ShortTermMemoryEntry,
+} from "@/lib/scenario/types";
+import { explainTurn } from "@/lib/scenario/debug-explain";
 import { getUnlockedModuleKeys } from "@/lib/modules/unlocks";
 
 const HISTORY_LIMIT = 20;
@@ -21,6 +26,9 @@ const MAX_MESSAGE_LENGTH = 2000;
 
 const chatSchema = z.object({
   message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
+  // Тумблер «Use LLM» панели отладки — учитывается только для player.isDebug (fail-open по
+  // умолчанию, чтобы обычные игроки и старые клиенты без этого поля никогда не блокировались).
+  useLlm: z.boolean().default(true),
 });
 
 export async function POST(request: Request) {
@@ -79,9 +87,13 @@ export async function POST(request: Request) {
 
   const resolution = resolveResponse(resolveInput);
 
+  // Только для дебаг-игроков переключатель «Use LLM» на панели отладки может заблокировать
+  // эскалацию до LLM — см. lib/debug/debug-context.tsx и components/debug/debug-panel.tsx.
+  const llmBlocked = player.isDebug && parsed.data.useLlm === false;
+
   let aiText: string;
   let handledByLayer: MessageLayer;
-  let escalationReason: string | null = null;
+  let escalationReason: EscalationReason | null = null;
   let llmUsage: {
     inputTokens: number;
     outputTokens: number;
@@ -90,9 +102,23 @@ export async function POST(request: Request) {
   } | null = null;
 
   try {
-    if (resolution.kind === "deterministic") {
+    if (llmBlocked && (resolution.kind === "light_llm" || resolution.kind === "full_llm")) {
+      handledByLayer = "DETERMINISTIC";
+      escalationReason =
+        resolution.kind === "light_llm"
+          ? "desync_light_blocked_toggle"
+          : "desync_full_blocked_toggle";
+      aiText = explainTurn({
+        handledByLayer,
+        matchedIntent: intentResult.intent,
+        intentConfidence: intentResult.confidence,
+        escalationReason,
+        desyncScore: resolution.stateUpdate.desyncScore,
+      });
+    } else if (resolution.kind === "deterministic") {
       aiText = resolution.fragment;
       handledByLayer = "DETERMINISTIC";
+      escalationReason = resolution.escalationReason ?? null;
     } else if (resolution.kind === "light_llm") {
       handledByLayer = "LIGHT_LLM";
       escalationReason = resolution.escalationReason;

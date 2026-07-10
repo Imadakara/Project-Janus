@@ -103,8 +103,11 @@ const STATE_UPDATE = {
   shortTermMemory: [],
 };
 
-function makeRequest(message: string) {
-  return new Request("http://test", { method: "POST", body: JSON.stringify({ message }) });
+function makeRequest(message: string, useLlm?: boolean) {
+  return new Request("http://test", {
+    method: "POST",
+    body: JSON.stringify(useLlm === undefined ? { message } : { message, useLlm }),
+  });
 }
 
 describe("POST /api/chat", () => {
@@ -292,5 +295,104 @@ describe("POST /api/chat", () => {
 
     const res = await POST(makeRequest("бла бла бла"));
     expect(res.status).toBe(502);
+  });
+
+  it("blocks a light_llm escalation for a debug player with useLlm=false", async () => {
+    mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+    mockResolveResponse.mockReturnValue({
+      kind: "light_llm",
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 2,
+        fewShotExamples: [],
+      },
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+      escalationReason: "desync_light",
+    });
+
+    const res = await POST(makeRequest("бла бла бла", false));
+    const data = await res.json();
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockLlmCallLogCreate).not.toHaveBeenCalled();
+    expect(data.debug.handledByLayer).toBe("DETERMINISTIC");
+    expect(data.debug.escalationReason).toBe("desync_light_blocked_toggle");
+    expect(mockChatMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          handledByLayer: "DETERMINISTIC",
+          escalationReason: "desync_light_blocked_toggle",
+        }),
+      }),
+    );
+  });
+
+  it("blocks a full_llm escalation for a debug player with useLlm=false, skipping history/RAG", async () => {
+    mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+    mockResolveResponse.mockReturnValue({
+      kind: "full_llm",
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 4,
+        fewShotExamples: [],
+      },
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
+      escalationReason: "desync_full",
+    });
+
+    const res = await POST(makeRequest("синтезируй мне всё", false));
+    const data = await res.json();
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockSearchUnlockedMaterials).not.toHaveBeenCalled();
+    expect(mockChatMessageFindMany).not.toHaveBeenCalled();
+    expect(mockLlmCallLogCreate).not.toHaveBeenCalled();
+    expect(data.debug.escalationReason).toBe("desync_full_blocked_toggle");
+  });
+
+  it("ignores useLlm=false for a non-debug player — LLM is still called", async () => {
+    mockResolveResponse.mockReturnValue({
+      kind: "light_llm",
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 2,
+        fewShotExamples: [],
+      },
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+      escalationReason: "desync_light",
+    });
+
+    const res = await POST(makeRequest("бла бла бла", false));
+    const data = await res.json();
+
+    expect(mockGenerate).toHaveBeenCalledOnce();
+    expect(data.message).toBe("ответ ИИ");
+  });
+
+  it("surfaces desync_full_budget_exceeded in the debug payload", async () => {
+    mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+    mockIsFullLlmBudgetExceeded.mockReturnValue(true);
+    mockResolveResponse.mockReturnValue({
+      kind: "deterministic",
+      fragment: "отказ, бюджет исчерпан",
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
+      escalationReason: "desync_full_budget_exceeded",
+    });
+
+    const res = await POST(makeRequest("ещё один сложный вопрос"));
+    const data = await res.json();
+
+    expect(data.debug.escalationReason).toBe("desync_full_budget_exceeded");
+    expect(mockChatMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ escalationReason: "desync_full_budget_exceeded" }),
+      }),
+    );
   });
 });

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { VT323 } from "next/font/google";
 import "./globals.css";
 import { CrtScreen } from "@/components/terminal/crt-screen";
+import { DebugPanel } from "@/components/debug/debug-panel";
+import { DebugProvider } from "@/lib/debug/debug-context";
+import { getCurrentPlayer } from "@/lib/auth/server";
 
 const vt323 = VT323({
   variable: "--font-terminal",
@@ -14,15 +17,20 @@ export const metadata: Metadata = {
   description: "Терминал доступа PROJECT JANUS",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const player = await getCurrentPlayer();
+
   return (
     <html lang="ru" className={`${vt323.variable} h-full`}>
       <body className="flex min-h-full flex-col">
-        <CrtScreen>{children}</CrtScreen>
+        <DebugProvider isDebugInitial={player?.isDebug ?? false}>
+          <CrtScreen>{children}</CrtScreen>
+          <DebugPanel />
+        </DebugProvider>
       </body>
     </html>
   );
