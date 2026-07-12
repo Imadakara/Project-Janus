@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BootSequence } from "@/components/terminal/boot-sequence";
+import { TypedText } from "@/components/terminal/typed-text";
 import { JUST_AUTHENTICATED_KEY } from "@/lib/auth/boot-flag";
 
 function consumeJustAuthenticatedFlag(): boolean {
@@ -78,8 +79,12 @@ export function TerminalHub({ email, roleLabel }: { email: string; roleLabel: st
   return (
     <main className="flex min-h-screen flex-col gap-8 px-6 py-10 sm:px-12">
       <div>
-        <p>ПОЗЫВНОЙ: {email}</p>
-        <p>РОЛЬ: {roleLabel}</p>
+        <p>
+          <TypedText text={`ПОЗЫВНОЙ: ${email}`} />
+        </p>
+        <p>
+          <TypedText text={`РОЛЬ: ${roleLabel}`} />
+        </p>
       </div>
       <div>
         <p className="mb-3 opacity-70">C:\JANUS\PROGRAMS&gt; DIR</p>

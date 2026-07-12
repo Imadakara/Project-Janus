@@ -42,6 +42,16 @@ body {
   text-shadow: 0 0 2px currentColor;
 }
 
+/* Tailwind preflight жёстко задаёт моноширинный font-family для pre/code/kbd/samp —
+   возвращаем наследование, чтобы они брали шрифт из контекста (Tiny5 на сайте,
+   --font-debug внутри debug-panel-*), а не системный моноширинный стек. */
+pre,
+code,
+kbd,
+samp {
+  font-family: inherit;
+}
+
 ::selection {
   background: var(--color-amber);
   color: var(--color-crt-bg);

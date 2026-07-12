@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { VT323 } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { CrtScreen } from "@/components/terminal/crt-screen";
 import { DebugPanel } from "@/components/debug/debug-panel";
@@ -7,10 +7,11 @@ import { DebugProvider } from "@/lib/debug/debug-context";
 import { SessionGuard } from "@/components/auth/session-guard";
 import { getCurrentPlayer } from "@/lib/auth/server";
 
-const vt323 = VT323({
+const tiny5 = localFont({
+  src: "./fonts/Tiny5-CRTRegular.woff2",
   variable: "--font-terminal",
-  subsets: ["latin"],
   weight: "400",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ export default async function RootLayout({
   const player = await getCurrentPlayer();
 
   return (
-    <html lang="ru" className={`${vt323.variable} h-full`}>
+    <html lang="ru" className={`${tiny5.variable} h-full`}>
       <body className="flex min-h-full flex-col">
         <DebugProvider isDebugInitial={player?.isDebug ?? false}>
           <CrtScreen>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TypedText } from "@/components/terminal/typed-text";
 
 type FolderEntry = { path: string; name: string };
 type FileEntry = { id: string; filename: string; extension: string; requiredModuleKey: string };
@@ -160,7 +161,11 @@ export function FileManager() {
               </p>
             )}
           </div>
-          {actionOutput && <pre className="mt-4 whitespace-pre-wrap">{actionOutput}</pre>}
+          {actionOutput && (
+            <pre className="mt-4 whitespace-pre-wrap">
+              <TypedText text={actionOutput} />
+            </pre>
+          )}
         </div>
       )}
     </main>

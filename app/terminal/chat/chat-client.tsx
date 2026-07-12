@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChatExitButton } from "./chat-exit-button";
+import { TypedText } from "@/components/terminal/typed-text";
 import { useDebug, type AiTurnLogEntry, type SessionDebugState } from "@/lib/debug/debug-context";
 import { formatTurnTag, isBlockedByToggle } from "@/lib/scenario/debug-explain";
 import type { EscalationReason } from "@/lib/scenario/types";
@@ -19,6 +20,10 @@ type Message = {
   // Известен только для ходов, полученных в текущей живой сессии (не персистится по-сообщённо
   // в БД) — см. lib/scenario/debug-explain.ts.
   desyncScore?: number | null;
+  // Побуквенный вывод — только для реплик ИИ, полученных в текущей живой сессии; история,
+  // загруженная при монтировании (initialMessages), отображается сразу, иначе весь диалог
+  // перепечатывался бы заново при каждом обновлении страницы.
+  animate?: boolean;
 };
 
 export function ChatClient({
@@ -104,6 +109,7 @@ export function ChatClient({
           intentConfidence: data.debug?.intentConfidence ?? null,
           escalationReason: data.debug?.escalationReason ?? null,
           desyncScore: data.debug?.session?.desyncScore ?? null,
+          animate: true,
         },
       ]);
 
@@ -154,7 +160,7 @@ export function ChatClient({
             <div key={m.id}>
               <p className="whitespace-pre-wrap">
                 <span className="opacity-70">{m.role === "PLAYER" ? "> " : "ЯНУС> "}</span>
-                {m.content}
+                {m.role === "AI" && m.animate ? <TypedText text={m.content} /> : m.content}
               </p>
               {showDebugAnnotation && (
                 <p
