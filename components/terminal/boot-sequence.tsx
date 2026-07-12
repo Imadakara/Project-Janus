@@ -16,10 +16,10 @@ export function BootSequence({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     if (visibleCount >= BOOT_LINES.length) {
-      const timeout = setTimeout(onDone, 700);
+      const timeout = setTimeout(onDone, 1400);
       return () => clearTimeout(timeout);
     }
-    const timeout = setTimeout(() => setVisibleCount((c) => c + 1), 350);
+    const timeout = setTimeout(() => setVisibleCount((c) => c + 1), 700);
     return () => clearTimeout(timeout);
   }, [visibleCount, onDone]);
 

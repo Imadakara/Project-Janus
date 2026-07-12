@@ -3,6 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BootSequence } from "@/components/terminal/boot-sequence";
+import { JUST_AUTHENTICATED_KEY } from "@/lib/auth/boot-flag";
+
+function consumeJustAuthenticatedFlag(): boolean {
+  // Ленивый инициализатор useState выполняется синхронно при монтировании, до первой отрисовки —
+  // в отличие от useEffect (который срабатывает уже ПОСЛЕ первого paint'а и раньше вызывал
+  // видимую вспышку хаба на один кадр перед boot-экраном). На сервере sessionStorage недоступен,
+  // но сюда мы попадаем только при клиентской навигации после логина, так что SSR-ветка ниже —
+  // просто защита от падения, а не реальный путь показа boot-экрана.
+  if (typeof window === "undefined") return false;
+  if (!sessionStorage.getItem(JUST_AUTHENTICATED_KEY)) return false;
+  sessionStorage.removeItem(JUST_AUTHENTICATED_KEY);
+  return true;
+}
 
 type Program = {
   key: string;
@@ -17,24 +30,12 @@ const PROGRAMS: Program[] = [
   { key: "logout", file: "LOGOUT.EXE", desc: "ЗАВЕРШИТЬ СЕАНС" },
 ];
 
-const BOOT_SESSION_KEY = "janus_boot_shown";
-
 export function TerminalHub({ email, roleLabel }: { email: string; roleLabel: string }) {
   const router = useRouter();
-  const [showBoot, setShowBoot] = useState(true);
+  const [showBoot, setShowBoot] = useState(consumeJustAuthenticatedFlag);
   const [selected, setSelected] = useState(0);
 
-  useEffect(() => {
-    // Одноразовое чтение флага из sessionStorage при монтировании — не подписка на внешние
-    // изменения, поэтому синхронный setState здесь безопасен.
-    if (sessionStorage.getItem(BOOT_SESSION_KEY)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShowBoot(false);
-    }
-  }, []);
-
   const handleBootDone = useCallback(() => {
-    sessionStorage.setItem(BOOT_SESSION_KEY, "1");
     setShowBoot(false);
   }, []);
 

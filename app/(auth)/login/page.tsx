@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { JUST_AUTHENTICATED_KEY } from "@/lib/auth/boot-flag";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function LoginPage() {
         return;
       }
 
+      sessionStorage.setItem(JUST_AUTHENTICATED_KEY, "1");
       router.push("/terminal");
       router.refresh();
     } finally {

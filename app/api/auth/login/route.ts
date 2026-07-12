@@ -37,7 +37,9 @@ export async function POST(request: Request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    // Без maxAge/expires — кука сессионная: браузер удаляет её при полном закрытии, и после
+    // перезапуска браузера игрока принудительно возвращает на /login (см. lib/auth/boot-flag.ts
+    // и связанную анимацию загрузки — она снова должна проиграться после этого повторного входа).
   });
 
   return response;
