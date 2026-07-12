@@ -31,6 +31,12 @@ async function main() {
       isDefault: true,
     },
     {
+      key: "CHESS",
+      name: "CHESS",
+      description: "Шахматы против искусственного интеллекта. Не реализован в MVP.",
+      isDefault: true,
+    },
+    {
       key: "MAP_VIEWER",
       name: "ПРОСМОТРЩИК КАРТ",
       description: "Визуализация тактических карт (.TAC). Не реализован в MVP.",
@@ -79,6 +85,21 @@ async function main() {
         moduleUnlocks: { create: defaultModuleKeys.map((moduleKey) => ({ moduleKey })) },
       },
     });
+  }
+
+  // Бэкафилл: игроки, зарегистрированные до появления нового isDefault-модуля (например
+  // CHESS), не получают его автоматически при повторном запуске сида — добираем недостающие
+  // разблокировки вручную для всех существующих аккаунтов.
+  const defaultModuleKeys = modules.filter((mod) => mod.isDefault).map((mod) => mod.key);
+  const allPlayers = await prisma.player.findMany({ select: { id: true } });
+  for (const player of allPlayers) {
+    for (const moduleKey of defaultModuleKeys) {
+      await prisma.playerModuleUnlock.upsert({
+        where: { playerId_moduleKey: { playerId: player.id, moduleKey } },
+        create: { playerId: player.id, moduleKey },
+        update: {},
+      });
+    }
   }
 
   for (const folder of seedFiles.folders) {

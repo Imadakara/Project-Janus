@@ -28,6 +28,7 @@ type Program = {
 const PROGRAMS: Program[] = [
   { key: "chat", file: "CHAT.EXE", desc: "ДИАЛОГ С ИИ", href: "/terminal/chat" },
   { key: "files", file: "FILEMGR.EXE", desc: "МЕНЕДЖЕР ФАЙЛОВ", href: "/terminal/files" },
+  { key: "profile", file: "PROFILE.EXE", desc: "ПРОФИЛЬ ОПЕРАТОРА", href: "/terminal/profile" },
   { key: "logout", file: "LOGOUT.EXE", desc: "ЗАВЕРШИТЬ СЕАНС" },
 ];
 
