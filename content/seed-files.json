@@ -11,9 +11,24 @@
       "name": "TACTICAL",
       "parentPath": "/ARCHIVE",
       "visibleToRole": null
+    },
+    {
+      "path": "/GAMES",
+      "name": "GAMES",
+      "parentPath": null,
+      "visibleToRole": null
     }
   ],
   "files": [
+    {
+      "folderPath": "/GAMES",
+      "filename": "CHESS",
+      "extension": ".EXE",
+      "requiredModuleKey": "CHESS",
+      "visibleToRole": null,
+      "analysisSummary": "АНАЛИЗ ЗАВЕРШЁН: исполняемый модуль. Обнаружена шахматная логика и подпрограмма противника. Назначение — тренировка тактического мышления оператора.",
+      "fullContent": "ПОДПРОГРАММА CHESS.EXE\nНАЗНАЧЕНИЕ: ТРЕНАЖЁР ТАКТИЧЕСКОГО МЫШЛЕНИЯ\nПРОТИВНИК: ВСТРОЕННЫЙ ИИ ТЕРМИНАЛА\n\n[TODO: заменить финальным текстом от нарративного дизайнера]"
+    },
     {
       "folderPath": "/ARCHIVE",
       "filename": "SITREP-004",

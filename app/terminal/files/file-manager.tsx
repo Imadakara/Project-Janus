@@ -13,6 +13,12 @@ function parentOf(path: string): string {
   return segments.length ? "/" + segments.join("/") : "/";
 }
 
+// Исполняемые файлы (.EXE) — не текстовый контент: вместо вывода fullContent в <pre>
+// открывают отдельный интерактивный экран терминала. Ключ — имя файла без расширения.
+const PROGRAM_ROUTES: Record<string, string> = {
+  CHESS: "/terminal/files/games/chess",
+};
+
 export function FileManager() {
   const router = useRouter();
   const [path, setPath] = useState("/");
@@ -59,6 +65,8 @@ export function FileManager() {
 
   const canAnalyze = unlockedModules?.includes("FILE_ANALYZER") ?? false;
   const selectedFile = files.find((f) => f.id === selectedFileId) ?? null;
+  const programRoute =
+    selectedFile?.extension === ".EXE" ? PROGRAM_ROUTES[selectedFile.filename] : undefined;
 
   return (
     <main className="flex min-h-screen flex-col gap-4 px-6 py-8 sm:px-12">
@@ -149,11 +157,13 @@ export function FileManager() {
             {unlockedModules?.includes(selectedFile.requiredModuleKey) ? (
               <button
                 type="button"
-                onClick={() => runAction(selectedFile.id, "open")}
+                onClick={() =>
+                  programRoute ? router.push(programRoute) : runAction(selectedFile.id, "open")
+                }
                 className="border px-3 py-1"
                 style={{ borderColor: "var(--color-amber-dim)" }}
               >
-                ОТКРЫТЬ
+                {programRoute ? "ЗАПУСТИТЬ" : "ОТКРЫТЬ"}
               </button>
             ) : (
               <p className="opacity-70">

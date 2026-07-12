@@ -3,7 +3,12 @@
 // (SEARCH, MEMORY_MANAGER, MAP_VIEWER и т.д.) существуют только как записи в БД/реестре и
 // дают игровое сообщение об отказе доступа вместо реальной функциональности.
 
-export const IMPLEMENTED_MODULE_KEYS = ["FILE_MANAGER", "FILE_ANALYZER", "TEXT_VIEWER"] as const;
+export const IMPLEMENTED_MODULE_KEYS = [
+  "FILE_MANAGER",
+  "FILE_ANALYZER",
+  "TEXT_VIEWER",
+  "CHESS",
+] as const;
 
 export type ImplementedModuleKey = (typeof IMPLEMENTED_MODULE_KEYS)[number];
 

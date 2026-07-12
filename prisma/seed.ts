@@ -33,7 +33,7 @@ async function main() {
     {
       key: "CHESS",
       name: "CHESS",
-      description: "Шахматы против искусственного интеллекта. Не реализован в MVP.",
+      description: "Шахматы против искусственного интеллекта.",
       isDefault: true,
     },
     {
