@@ -3,6 +3,7 @@
 import { useDebug } from "@/lib/debug/debug-context";
 import { formatTurnTag } from "@/lib/scenario/debug-explain";
 import type { EscalationReason } from "@/lib/scenario/types";
+import { JanusDebugSection } from "./janus-debug-section";
 
 export function DebugPanel() {
   const {
@@ -129,6 +130,7 @@ export function DebugPanel() {
                           intentConfidence: entry.intentConfidence,
                           escalationReason: entry.escalationReason as EscalationReason | null,
                           desyncScore: entry.desyncScore,
+                          policyStage: entry.policyStage ?? null,
                         })}
                       </p>
                     ))}
@@ -136,6 +138,8 @@ export function DebugPanel() {
                 </div>
               </div>
             )}
+
+            <JanusDebugSection />
           </div>
         </>
       )}

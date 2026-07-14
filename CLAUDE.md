@@ -65,16 +65,16 @@ scenario-session state, per-turn decision explanation, a "Use LLM" toggle, and c
 
 ## Commands
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Dev server (Next.js + Turbopack) — assumes env already up |
-| `npm run build` / `npm run start` | Production build / server |
-| `npm run lint` | ESLint |
-| `npm run format` / `format:check` | Prettier write / check |
-| `npm test` | Full Vitest suite |
-| `npx vitest run path/to/file.test.ts` | Single test file (drop `run` for watch mode) |
-| `npm run prisma:seed` | Reseed modules + draft filesystem content + debug player |
-| `npm run metrics` | MVP metrics incl. dialogue-engine layer distribution |
+| Command                               | Purpose                                                   |
+| ------------------------------------- | --------------------------------------------------------- |
+| `npm run dev`                         | Dev server (Next.js + Turbopack) — assumes env already up |
+| `npm run build` / `npm run start`     | Production build / server                                 |
+| `npm run lint`                        | ESLint                                                    |
+| `npm run format` / `format:check`     | Prettier write / check                                    |
+| `npm test`                            | Full Vitest suite                                         |
+| `npx vitest run path/to/file.test.ts` | Single test file (drop `run` for watch mode)              |
+| `npm run prisma:seed`                 | Reseed modules + draft filesystem content + debug player  |
+| `npm run metrics`                     | MVP metrics incl. dialogue-engine layer distribution      |
 
 ## Project structure
 
@@ -83,10 +83,15 @@ scenario-session state, per-turn decision explanation, a "Use LLM" toggle, and c
   /terminal            — terminal shell (hub/greeting)
     /chat               — AI dialogue screen
     /files              — file manager screen
+    /vitals              — PULS.EXE: life-signs monitor + core-failure forecast (polling)
+    /losses              — GUBITAK.EXE: loss ledger («Књига губитака») with chain check
   /api
-    /chat               — dialogue endpoint (hybrid engine, Layers 1-3)
+    /chat               — dialogue endpoint (hybrid engine, Layers 1-3 + degradation policy)
     /terminal/modules    — modules unlocked for the player
     /terminal/files       — folder/file listing, open, analyze
+    /terminal/vitals      — JanusState snapshot for PULS (stale-recompute on read)
+    /terminal/losses      — loss-ledger entries + server-side hash-chain verification
+    /debug/janus          — isDebug-only mortality controls (set M, ±shares, kill, churn tick)
     /auth               — register/login/logout
   /(auth)/login, /register
   /generated/prisma     — generated Prisma client (do not hand-edit)
@@ -96,6 +101,11 @@ scenario-session state, per-turn decision explanation, a "Use LLM" toggle, and c
   /ai
     /providers           — Layer 3: LlmProvider abstraction (Claude / self-hosted OpenAI-compatible)
     prompt-builder.ts, guards.ts, rag.ts, system-prompt.ts, client.ts, rate-limit.ts
+  /janus                 — "Смертный ЯНУС" (Phase 1): global JanusState singleton (state.ts),
+                           degradation policy (degradation.ts, subsystems.ts), death forecast
+                           (forecast.ts — seeded Monte-Carlo), segment death (death.ts — the ONLY
+                           code path to DEAD), loss-ledger hash chain (ledger.ts), integrity index,
+                           synthetic churn, chat slots/brief
   /embeddings            — local embedding client (@xenova/transformers)
   /auth                  — sessions (JWT), passwords, role assignment
   /db                    — Prisma client singleton
@@ -103,7 +113,7 @@ scenario-session state, per-turn decision explanation, a "Use LLM" toggle, and c
   /chat                  — active dialogue session handling
   /analytics             — MVP event tracking
 /prisma                  — schema.prisma, migrations/, seed.ts
-/content                 — seed-files.json, intents.json, response-pools.json (draft narrative text)
+/content                 — seed-files.json, intents.json, response-pools.json, memory-segments.json
 /scripts                 — start/stop scripts, launch-app.ps1, metrics.ts
 proxy.ts                 — Next 16's middleware-equivalent; guards /terminal/* and /api/*
 ```
@@ -131,14 +141,30 @@ Per player message, orchestrated in `app/api/chat/route.ts`:
    chat rate limit — exceeding it returns a deterministic in-fiction refusal, never a silent
    failure or a raw error.
 
+**Mortality layer (Фаза 1 «Смертный ЯНУС», `lib/janus/`)** wraps all three layers per turn:
+`getJanusState()` → `resolveDegradationPolicy()` computed in the route and passed into
+`resolveResponse()`. The policy caps the max layer by compute margin M (coma `< 0.2` is
+intercepted before intent classification; `0.2–0.4` forces the EMERGENCY pool and blocks
+full_llm with `escalationReason: "degradation_cap"`; `0.4–0.7` shuts subsystems down in a
+published order — their intents answer from the DEGRADED pool), adds memory-decay noise
+(`desyncScore` per-turn bonus + probabilistic «провалы») when `integrityIndex` drops, and
+returns `replyDelayMs` the chat client honors as queue diegetics. Memory segments
+(`MemorySegment`) die only through `lib/janus/death.ts::killSegment` — it nulls the bound
+files' RAG embeddings, appends a SHA-256 hash-chained `LossLedgerEntry`, and recomputes the
+public death forecast (`forecast.ts`, seeded Monte-Carlo — reproducible by design). RAG
+detects questions about dead content via segment tombstone embeddings (`RagSearchOutcome`
+`{kind:"lost"}` → deterministic MEMORY_LOST reply, no provider call). Seed never touches DEAD
+segments and never re-embeds their files.
+
 Full spec and implementation notes (including the manual e2e acceptance checklist run before
-release): `Разработка/ТЗ - Гибридный диалоговый движок (Слои 1-3) для Claude Code.md` and
+release): `Разработка/ТЗ - Смертный ЯНУС (Фазы 1-4) для Claude Code.md`,
+`Разработка/Тех.Описание реализации — Смертный ЯНУС (Фаза 1).md` and
 `Разработка/Тех.Описание реализации — Гибридный диалоговый движок (Слои 1-3).md` in the vault.
 
 All in-fiction narrative text (system prompt character text, response-pool fragments, archive
 file content in `content/*.json`) is currently placeholder/draft, marked
 `[TODO: заменить финальным текстом от нарративного дизайнера]` — don't treat its content as
-final copy when reasoning about tone or lore; do treat its *structure* as load-bearing.
+final copy when reasoning about tone or lore; do treat its _structure_ as load-bearing.
 
 ## Conventions
 
@@ -150,8 +176,8 @@ final copy when reasoning about tone or lore; do treat its *structure* as load-b
   are `console.error`'d server-side and mapped to a 502 in-fiction message.
 - `proxy.ts` gates `/terminal/*` and `/api/*` at the edge, but route handlers still re-check
   `getCurrentPlayer()` themselves — defense in depth, don't rely solely on the proxy.
-- Comments in this codebase are written in Russian and explain *why*, with cross-references to
-  related files by path — match that style rather than switching to English or restating *what*
+- Comments in this codebase are written in Russian and explain _why_, with cross-references to
+  related files by path — match that style rather than switching to English or restating _what_
   the code does.
 - Pure logic is deliberately pulled out of routes/DB access into small, DB-free functions (e.g.
   `lib/modules/access.ts`, `lib/scenario/desync.ts`) specifically so it's unit-testable without a

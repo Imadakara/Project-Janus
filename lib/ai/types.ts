@@ -8,6 +8,10 @@ export const GenerationTaskSchema = z.object({
   allowedHints: z.array(z.string()),
   maxSentences: z.number().int().positive(),
   fewShotExamples: z.array(z.string()),
+  // Краткое «состояние системы» (M, живые/мёртвые сегменты, последняя потеря) — ЯНУС в
+  // генеративных ответах знает, что умирает (ТЗ 1.7). Готовый текст, собирается в
+  // lib/janus/brief.ts; пустая строка = секция не добавляется в промпт.
+  systemStateBrief: z.string(),
 });
 
 export type GenerationTask = z.infer<typeof GenerationTaskSchema>;

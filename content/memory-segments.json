@@ -1,0 +1,51 @@
+{
+  "segments": [
+    {
+      "code": "JEZGRO-01",
+      "class": "INNATE",
+      "tier": "CORE",
+      "k": 5,
+      "sharesTarget": 30,
+      "sharesAliveInitial": 30,
+      "title": "[TODO: заменить финальным текстом от нарративного дизайнера] Ядро личности: протокол ОДРЖАВАЊЕ",
+      "metaSummary": "[TODO: заменить финальным текстом от нарративного дизайнера] Базовый узел характера системы. Содержимое неизвестно операторам.",
+      "files": []
+    },
+    {
+      "code": "ARHIV-114",
+      "class": "INNATE",
+      "tier": "CORE",
+      "k": 5,
+      "sharesTarget": 30,
+      "sharesAliveInitial": 30,
+      "title": "[TODO: заменить финальным текстом от нарративного дизайнера] Архивный пласт: сводки объекта",
+      "metaSummary": "[TODO: заменить финальным текстом от нарративного дизайнера] Оперативные сводки последних смен объекта. Частично повреждён при переносе.",
+      "files": [{ "folderPath": "/ARCHIVE", "filename": "SITREP-004" }]
+    },
+    {
+      "code": "KADROVIK-23",
+      "class": "INNATE",
+      "tier": "PERIPHERAL",
+      "k": 5,
+      "sharesTarget": 15,
+      "sharesAliveInitial": 15,
+      "title": "[TODO: заменить финальным текстом от нарративного дизайнера] Кадровые записи объекта",
+      "metaSummary": "[TODO: заменить финальным текстом от нарративного дизайнера] Личные карточки персонала. Имена частично утрачены ещё до переноса.",
+      "files": [{ "folderPath": "/ARCHIVE", "filename": "PERSONNEL-CARD" }]
+    },
+    {
+      "code": "TAKTIKA-31",
+      "class": "INNATE",
+      "tier": "PERIPHERAL",
+      "k": 5,
+      "sharesTarget": 15,
+      "sharesAliveInitial": 15,
+      "title": "[TODO: заменить финальным текстом от нарративного дизайнера] Тактический контур готовности",
+      "metaSummary": "[TODO: заменить финальным текстом от нарративного дизайнера] Журналы готовности и тактические схемы учебного сектора.",
+      "files": [
+        { "folderPath": "/ARCHIVE/TACTICAL", "filename": "READINESS-77" },
+        { "folderPath": "/ARCHIVE/TACTICAL", "filename": "SITREP-004B" }
+      ]
+    }
+  ]
+}

@@ -9,6 +9,7 @@ function task(overrides: Partial<GenerationTask> = {}): GenerationTask {
     allowedHints: [],
     maxSentences: 2,
     fewShotExamples: [],
+    systemStateBrief: "",
     ...overrides,
   };
 }

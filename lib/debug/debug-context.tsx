@@ -30,6 +30,8 @@ export type AiTurnLogEntry = {
   escalationReason: string | null;
   // null — историческое сообщение, загруженное со страницы (не персистится по-сообщённо в БД).
   desyncScore: number | null;
+  // Стадия политики деградации (Фаза 1); null — историческое сообщение.
+  policyStage?: string | null;
 };
 
 const EMPTY_SESSION_DEBUG: SessionDebugState = {

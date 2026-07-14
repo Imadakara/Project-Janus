@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/db";
 import type { Role } from "@/app/generated/prisma/client";
 
-export type FragmentsByPoolType = { NORMAL: string[]; REPEATED: string[] };
+export type FragmentsByPoolType = {
+  NORMAL: string[];
+  REPEATED: string[];
+  // Пер-интентные пулы политики деградации (lib/janus/degradation.ts): DEGRADED — подсистема
+  // интента погашена, EMERGENCY — аварийный режим всей системы.
+  DEGRADED: string[];
+  EMERGENCY: string[];
+};
 
 // resolveResponse (resolve.ts) остаётся чистой функцией без доступа к БД — этот модуль
 // заранее подтягивает тексты фрагментов для сматченного intent'а, которые вызывающий
@@ -21,9 +28,9 @@ export async function loadFragmentsForIntent(
     include: { fragments: true },
   });
 
-  const result: FragmentsByPoolType = { NORMAL: [], REPEATED: [] };
+  const result: FragmentsByPoolType = { NORMAL: [], REPEATED: [], DEGRADED: [], EMERGENCY: [] };
 
-  for (const type of ["NORMAL", "REPEATED"] as const) {
+  for (const type of ["NORMAL", "REPEATED", "DEGRADED", "EMERGENCY"] as const) {
     const roleSpecific = pools.find(
       (pool) => pool.type === type && pool.requiredRole === playerRole,
     );

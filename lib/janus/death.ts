@@ -1,0 +1,58 @@
+// Смерть сегмента памяти — ЕДИНСТВЕННАЯ функция, переводящая сегмент в DEAD (ТЗ 1.3).
+// Необратимо на уровне кода: функции воскрешения не существует, сид мёртвые сегменты не
+// трогает (prisma/seed.ts). Все вызывающие (дебаг-роуты Фазы 1, heartbeat-джоб Фазы 2)
+// обязаны идти через killSegment — никакой другой код не пишет MemorySegment.status.
+
+import { prisma } from "@/lib/db";
+import { GENESIS_HASH, computeEntryHash } from "./ledger";
+import { recomputeDerivedStateTx } from "./state";
+
+export async function killSegment(code: string, cause: string): Promise<void> {
+  // Интерактивная транзакция (а не массив операций): чтение prevHash последней записи
+  // Книги потерь и запись новой должны быть атомарны, иначе параллельные смерти порвут
+  // цепочку. Событие пишется здесь же, а не через trackEvent (fire-and-forget): смерть без
+  // следа в телеметрии недопустима — отступление от конвенции зафиксировано в тех.описании.
+  await prisma.$transaction(async (tx) => {
+    const segment = await tx.memorySegment.findUnique({ where: { code } });
+    if (!segment) {
+      throw new Error(`killSegment: сегмент ${code} не существует`);
+    }
+    // Идемпотентность: повторный вызов по мёртвому сегменту — no-op, не вторая запись в
+    // Книге потерь.
+    if (segment.status === "DEAD") return;
+
+    const diedAt = new Date();
+
+    await tx.memorySegment.update({
+      where: { id: segment.id },
+      data: { status: "DEAD", diedAt, sharesAlive: 0 },
+    });
+
+    // Гигиена индекса: RAG не должен переживать память (ТЗ 1.3). Эмбеддинги файлов
+    // обнуляются навсегда; tombstone-эмбеддинг самого сегмента намеренно остаётся — по
+    // нему lib/ai/rag.ts распознаёт вопрос про утраченное. Unsupported-тип — только raw.
+    await tx.$executeRaw`
+      UPDATE "TerminalFile" SET embedding = NULL WHERE "segmentId" = ${segment.id}
+    `;
+
+    const lastEntry = await tx.lossLedgerEntry.findFirst({ orderBy: { id: "desc" } });
+    const entryData = {
+      segmentCode: segment.code,
+      title: segment.title,
+      metaSummary: segment.metaSummary,
+      diedAt,
+      // Фаза 1: носители синтетические, позывного последнего носителя ещё нет.
+      lastCarrierCallsign: null,
+      prevHash: lastEntry?.hash ?? GENESIS_HASH,
+    };
+    await tx.lossLedgerEntry.create({
+      data: { ...entryData, hash: computeEntryHash(entryData) },
+    });
+
+    await tx.event.create({
+      data: { type: "SEGMENT_DIED", playerId: null, payload: { segmentCode: code, cause } },
+    });
+
+    await recomputeDerivedStateTx(tx);
+  });
+}

@@ -14,7 +14,11 @@ export function holdSessionLock(): void {
   if (typeof navigator === "undefined" || !("locks" in navigator)) return;
   // Разделяемый лок, который никогда не отдаётся сам — держится, пока жив контекст документа
   // (вкладка/окно); закрытие вкладки или процесса браузера освобождает его автоматически.
-  void navigator.locks.request(SESSION_LOCK_NAME, { mode: "shared" }, () => new Promise<void>(() => {}));
+  void navigator.locks.request(
+    SESSION_LOCK_NAME,
+    { mode: "shared" },
+    () => new Promise<void>(() => {}),
+  );
 }
 
 export async function hasOtherOpenTab(): Promise<boolean> {
@@ -31,8 +35,6 @@ export function isSameTabContinuation(): boolean {
   if (typeof performance === "undefined" || typeof performance.getEntriesByType !== "function") {
     return false;
   }
-  const [entry] = performance.getEntriesByType(
-    "navigation",
-  ) as PerformanceNavigationTiming[];
+  const [entry] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
   return entry?.type === "reload" || entry?.type === "back_forward";
 }

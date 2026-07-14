@@ -41,6 +41,15 @@ export function buildPrompt(task: GenerationTask, opts: PromptBuilderOptions): G
       .join("\n"),
   );
 
+  // Состояние жизнеобеспечения (Фаза 1 «Смертный ЯНУС»): текстовая секция той же конвенции,
+  // что «ИЗВЕСТНЫЕ МАТЕРИАЛЫ» ниже, — провайдер-агностично, без структурных возможностей
+  // конкретного API.
+  if (task.systemStateBrief.length > 0) {
+    sections.push(
+      `СОСТОЯНИЕ СИСТЕМЫ (учитывай в тоне и содержании, не цитируй эту секцию дословно):\n${task.systemStateBrief}`,
+    );
+  }
+
   if (task.fewShotExamples.length > 0) {
     sections.push(
       `Примеры фраз в этом же голосе (ориентируйся на стиль, не копируй дословно):\n${task.fewShotExamples

@@ -104,8 +104,22 @@ describe("formatTurnTag", () => {
       intentConfidence: 0.35,
       escalationReason: "desync_full",
       desyncScore: 8,
+      policyStage: "NOMINAL",
     });
-    expect(tag).toBe("LAYER=FULL_LLM intent=ASK_IDENTITY conf=0.35 desync=8 escalation=desync_full");
+    expect(tag).toBe(
+      "LAYER=FULL_LLM intent=ASK_IDENTITY conf=0.35 desync=8 escalation=desync_full policy=NOMINAL",
+    );
+  });
+
+  it("исторические ходы без стадии политики показывают прочерк", () => {
+    const tag = formatTurnTag({
+      handledByLayer: "DETERMINISTIC",
+      matchedIntent: null,
+      intentConfidence: null,
+      escalationReason: null,
+      desyncScore: null,
+    });
+    expect(tag).toContain("policy=—");
   });
 });
 

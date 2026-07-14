@@ -17,6 +17,8 @@ const mockApplyGuards = vi.fn();
 const mockSearchUnlockedMaterials = vi.fn();
 const mockGetUnlockedModuleKeys = vi.fn();
 const mockTrackEvent = vi.fn();
+const mockGetJanusState = vi.fn();
+const mockLoadSystemStateBrief = vi.fn();
 
 vi.mock("@/lib/auth/server", () => ({
   getCurrentPlayer: () => mockGetCurrentPlayer(),
@@ -82,7 +84,27 @@ vi.mock("@/lib/modules/unlocks", () => ({
   getUnlockedModuleKeys: (...args: unknown[]) => mockGetUnlockedModuleKeys(...args),
 }));
 
+// Глобальное состояние ЯНУСа (Фаза 1): мокаются модули с БД; чистые
+// resolveDegradationPolicy/buildChatSlots работают по-настоящему от этого снапшота.
+vi.mock("@/lib/janus/state", () => ({
+  getJanusState: (...args: unknown[]) => mockGetJanusState(...args),
+}));
+
+vi.mock("@/lib/janus/brief", () => ({
+  loadSystemStateBrief: (...args: unknown[]) => mockLoadSystemStateBrief(...args),
+}));
+
 const { POST } = await import("./route");
+
+const NOMINAL_JANUS_STATE = {
+  computeMargin: 1.0,
+  integrityIndex: 1.0,
+  subsystems: { ANALYTICS: "UP", PLANNING: "UP", ARCHIVE: "UP", COMMS: "UP" },
+  forecastDeathAt: new Date("2027-03-02T04:12:00Z"),
+  forecastP10At: new Date("2027-01-11T00:00:00Z"),
+  lambdaEstimate: 1 / 60,
+  updatedAt: new Date("2026-07-14T12:00:00Z"),
+};
 
 const PLAYER = { id: "player-1", role: "TECHNICIAN" };
 const SESSION = {
@@ -130,9 +152,11 @@ describe("POST /api/chat", () => {
       usage: { inputTokens: 10, outputTokens: 5 },
       model: "test-model",
     });
-    mockSearchUnlockedMaterials.mockResolvedValue([]);
+    mockSearchUnlockedMaterials.mockResolvedValue({ kind: "hits", results: [] });
     mockGetUnlockedModuleKeys.mockResolvedValue([]);
     mockChatMessageFindMany.mockResolvedValue([]);
+    mockGetJanusState.mockResolvedValue(NOMINAL_JANUS_STATE);
+    mockLoadSystemStateBrief.mockResolvedValue("состояние системы: номинально");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -269,6 +293,7 @@ describe("POST /api/chat", () => {
       matchedIntent: INTENT_RESULT.intent,
       intentConfidence: INTENT_RESULT.confidence,
       escalationReason: "desync_light",
+      policy: { stage: "NOMINAL", maxLayer: "FULL_LLM", replyDelayMs: 0 },
       session: {
         desyncScore: 3,
         lastConfidenceTier: "low",
@@ -392,6 +417,75 @@ describe("POST /api/chat", () => {
     expect(mockChatMessageCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ escalationReason: "desync_full_budget_exceeded" }),
+      }),
+    );
+  });
+
+  it("возвращает replyDelayMs из политики деградации", async () => {
+    mockGetJanusState.mockResolvedValue({ ...NOMINAL_JANUS_STATE, computeMargin: 0.85 });
+    mockResolveResponse.mockReturnValue({
+      kind: "deterministic",
+      fragment: "медленный ответ",
+      stateUpdate: STATE_UPDATE,
+    });
+
+    const res = await POST(makeRequest("Кто ты?"));
+    const data = await res.json();
+
+    expect(data.replyDelayMs).toBeGreaterThan(0);
+  });
+
+  it("кома (M < 0.2): фиксированный пул до классификации интента, состояние сессии не трогается", async () => {
+    mockGetJanusState.mockResolvedValue({ ...NOMINAL_JANUS_STATE, computeMargin: 0.1 });
+
+    const res = await POST(makeRequest("Кто ты?"));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(mockClassifyIntent).not.toHaveBeenCalled();
+    expect(mockResolveResponse).not.toHaveBeenCalled();
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockChatSessionUpdate).not.toHaveBeenCalled();
+    expect(data.message).toContain("PULS");
+    expect(mockChatMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          role: "AI",
+          handledByLayer: "DETERMINISTIC",
+          escalationReason: "coma",
+        }),
+      }),
+    );
+  });
+
+  it("маркер утраты из RAG перехватывает full_llm в MEMORY_LOST без вызова провайдера", async () => {
+    mockResolveResponse.mockReturnValue({
+      kind: "full_llm",
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 4,
+        fewShotExamples: [],
+        systemStateBrief: "",
+      },
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
+      escalationReason: "desync_full",
+    });
+    mockSearchUnlockedMaterials.mockResolvedValue({ kind: "lost", segmentCode: "ARHIV-114" });
+
+    const res = await POST(makeRequest("что было в сводках объекта?"));
+    const data = await res.json();
+
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockLlmCallLogCreate).not.toHaveBeenCalled();
+    expect(data.message).toContain("[TODO:");
+    expect(mockChatMessageCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          handledByLayer: "DETERMINISTIC",
+          escalationReason: "memory_lost",
+        }),
       }),
     );
   });

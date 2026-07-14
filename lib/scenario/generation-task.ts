@@ -19,6 +19,7 @@ export function buildGenerationTask(
   mode: "light" | "full",
   disposition: Disposition,
   fewShotExamples: string[],
+  systemStateBrief: string,
 ): GenerationTask {
   return {
     tone: describeTone(disposition),
@@ -28,5 +29,6 @@ export function buildGenerationTask(
       : [],
     maxSentences: mode === "light" ? 2 : 4,
     fewShotExamples: fewShotExamples.slice(0, 3),
+    systemStateBrief,
   };
 }

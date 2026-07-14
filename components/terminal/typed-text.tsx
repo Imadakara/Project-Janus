@@ -24,9 +24,12 @@ export function TypedText({
 }) {
   const [visibleLength, setVisibleLength] = useState(instant ? text.length : 0);
   // onDone кладём в ref, а не в зависимости эффекта — иначе инлайн-колбэк из родителя
-  // пересоздавался бы каждый рендер и перезапускал набор текста заново.
+  // пересоздавался бы каждый рендер и перезапускал набор текста заново. Обновление ref —
+  // в эффекте, не в теле рендера (react-hooks/refs).
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     const prefersReducedMotion =
@@ -34,6 +37,10 @@ export function TypedText({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (instant || prefersReducedMotion || text.length === 0) {
+      // Синхронный setState здесь намеренный: анимация — внешняя система (таймер), сброс
+      // видимой длины при смене text/instant и есть её синхронизация (прецедент подавления
+      // правила — lib/debug/debug-context.tsx).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibleLength(text.length);
       onDoneRef.current?.();
       return;

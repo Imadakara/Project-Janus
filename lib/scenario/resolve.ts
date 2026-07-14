@@ -1,12 +1,15 @@
 import type { Role } from "@/app/generated/prisma/client";
 import type { GenerationTask } from "@/lib/ai/types";
 import type { IntentResult } from "@/lib/intent/schema";
+import type { DegradationPolicy, MaxLayer } from "@/lib/janus/degradation";
+import { subsystemForIntent } from "@/lib/janus/subsystems";
 import { calculateDesyncScore } from "./desync";
 import { applyDispositionDelta } from "./disposition";
 import { pickFragment } from "./fragments";
 import { buildGenerationTask } from "./generation-task";
 import { nextRepeatCount, shouldUseRepeatedPool } from "./intent-repeat";
 import { nextShortTermMemory } from "./memory";
+import { MEMORY_LAPSE_FRAGMENTS } from "./refusal-fragments";
 import type { FragmentsByPoolType } from "./repository";
 import { DESYNC_FULL_LLM_MIN, DESYNC_LIGHT_LLM_MIN } from "./thresholds";
 import type { EscalationReason, ResolveStateUpdate, ScenarioSessionState } from "./types";
@@ -50,7 +53,35 @@ export type ResolveInput = {
   // Заранее подтянутые из БД тексты фрагментов для сматченного intent'а (или null, если
   // intent не распознан) — см. lib/scenario/repository.ts.
   fragmentsByPoolType: FragmentsByPoolType | null;
+  // Политика деградации на этот ход — вычисляется в роуте из JanusState
+  // (lib/janus/degradation.ts). Кома до resolveResponse не доходит (перехват в роуте),
+  // но потолок DETERMINISTIC здесь всё равно сработал бы — защита в глубину.
+  policy: DegradationPolicy;
+  // Живые значения для {{slotName}}-подстановки (lib/janus/slots.ts).
+  slots: Record<string, string>;
+  // Готовая секция «состояние системы» для генеративных слоёв (lib/janus/brief.ts).
+  systemStateBrief: string;
+  // Инъекция случайности для «провалов» памяти — тестируемость без моков Math.random.
+  rng?: () => number;
 };
+
+const LAYER_RANK: Record<MaxLayer, number> = { DETERMINISTIC: 0, LIGHT_LLM: 1, FULL_LLM: 2 };
+
+// Фрагмент детерминированного отказа при перехвате эскалации потолком политики: в аварийном
+// режиме — аварийный пул, при погашенных подсистемах — деградированный; фоллбэки вниз до
+// заглушки, чтобы отказ никогда не был пустым.
+function pickDegradationFragment(
+  policy: DegradationPolicy,
+  fragments: FragmentsByPoolType | null,
+  slots: Record<string, string>,
+): string {
+  const preferred =
+    policy.forcedPool === "EMERGENCY" ? (fragments?.EMERGENCY ?? []) : (fragments?.DEGRADED ?? []);
+  if (preferred.length > 0) return pickFragment(preferred, slots);
+  const normal = fragments?.NORMAL ?? [];
+  if (normal.length > 0) return pickFragment(normal, slots);
+  return pickFragment(UNRECOGNIZED_FRAGMENTS, slots);
+}
 
 export function resolveResponse(input: ResolveInput): ResolveOutput {
   const {
@@ -59,14 +90,23 @@ export function resolveResponse(input: ResolveInput): ResolveOutput {
     requiresSynthesis,
     fullLlmBudgetExceeded,
     fragmentsByPoolType,
+    policy,
+    slots,
+    systemStateBrief,
   } = input;
+  const rng = input.rng ?? Math.random;
 
   const disposition = applyDispositionDelta(sessionState.disposition, intentResult.tags);
-  const { desyncScore, lastConfidenceTier } = calculateDesyncScore(
+  const desyncFromIntent = calculateDesyncScore(
     { desyncScore: sessionState.desyncScore, lastConfidenceTier: sessionState.lastConfidenceTier },
     intentResult,
     requiresSynthesis,
   );
+  // Вклад деградации памяти: спутанность копится независимо от качества мэтчинга — игрок
+  // слышит умирание (концепт, раздел 5). При восстановлении системы накопленный desync даст
+  // всплеск LLM-ходов — осознанно («отходит после болезни»), параметр калибровки.
+  const desyncScore = desyncFromIntent.desyncScore + policy.desyncPerTurn;
+  const lastConfidenceTier = desyncFromIntent.lastConfidenceTier;
 
   const intentRepeatCount = intentResult.intent
     ? nextRepeatCount(sessionState.intentRepeatCount, intentResult.intent)
@@ -87,30 +127,97 @@ export function resolveResponse(input: ResolveInput): ResolveOutput {
 
   const fewShotExamples = fragmentsByPoolType?.NORMAL ?? [];
 
+  // «Провал» памяти: детерминированный итог с вероятностью memoryLapseProbability заменяется
+  // репликой спутанности; причина хода при этом не перетирается — телеметрия честная.
+  const withLapse = (output: ResolveOutput): ResolveOutput => {
+    if (output.kind !== "deterministic") return output;
+    if (policy.memoryLapseProbability <= 0 || rng() >= policy.memoryLapseProbability) {
+      return output;
+    }
+    return { ...output, fragment: pickFragment(MEMORY_LAPSE_FRAGMENTS, slots) };
+  };
+
   if (desyncScore >= DESYNC_FULL_LLM_MIN) {
-    if (fullLlmBudgetExceeded) {
-      return {
+    // Потолок политики деградации — перехват до вызова провайдера, по паттерну тумблера
+    // «Use LLM» в app/api/chat/route.ts (ТЗ 1.2).
+    if (LAYER_RANK.FULL_LLM > LAYER_RANK[policy.maxLayer]) {
+      return withLapse({
         kind: "deterministic",
-        fragment: pickFragment(BUDGET_REFUSAL_FRAGMENTS),
+        fragment: pickDegradationFragment(policy, fragmentsByPoolType, slots),
+        stateUpdate,
+        escalationReason: "degradation_cap",
+      });
+    }
+    if (fullLlmBudgetExceeded) {
+      return withLapse({
+        kind: "deterministic",
+        fragment: pickFragment(BUDGET_REFUSAL_FRAGMENTS, slots),
         stateUpdate,
         escalationReason: "desync_full_budget_exceeded",
-      };
+      });
     }
     return {
       kind: "full_llm",
-      task: buildGenerationTask(intentResult, "full", disposition, fewShotExamples),
+      task: buildGenerationTask(
+        intentResult,
+        "full",
+        disposition,
+        fewShotExamples,
+        systemStateBrief,
+      ),
       stateUpdate,
       escalationReason: "desync_full",
     };
   }
 
   if (desyncScore >= DESYNC_LIGHT_LLM_MIN) {
+    if (LAYER_RANK.LIGHT_LLM > LAYER_RANK[policy.maxLayer]) {
+      return withLapse({
+        kind: "deterministic",
+        fragment: pickDegradationFragment(policy, fragmentsByPoolType, slots),
+        stateUpdate,
+        escalationReason: "degradation_cap",
+      });
+    }
     return {
       kind: "light_llm",
-      task: buildGenerationTask(intentResult, "light", disposition, fewShotExamples),
+      task: buildGenerationTask(
+        intentResult,
+        "light",
+        disposition,
+        fewShotExamples,
+        systemStateBrief,
+      ),
       stateUpdate,
       escalationReason: "desync_light",
     };
+  }
+
+  // Детерминированная ветка. Интент погашенной подсистемы отвечает деградированным пулом:
+  // тема технически недоступна, и это слышно (ТЗ 1.2, таблица M 0.4-0.7).
+  const subsystem = subsystemForIntent(intentResult.intent);
+  if (subsystem && policy.subsystems[subsystem] === "DOWN") {
+    const degraded = fragmentsByPoolType?.DEGRADED ?? [];
+    return withLapse({
+      kind: "deterministic",
+      fragment:
+        degraded.length > 0
+          ? pickFragment(degraded, slots)
+          : pickFragment(UNRECOGNIZED_FRAGMENTS, slots),
+      stateUpdate,
+      escalationReason: "subsystem_down",
+    });
+  }
+
+  // Аварийный режим переводит обычные детерминированные ответы в аварийный пул (если он
+  // есть у интента) — короткие реплики, отказ от сложных тем.
+  const emergency = fragmentsByPoolType?.EMERGENCY ?? [];
+  if (policy.forcedPool === "EMERGENCY" && emergency.length > 0) {
+    return withLapse({
+      kind: "deterministic",
+      fragment: pickFragment(emergency, slots),
+      stateUpdate,
+    });
   }
 
   const poolFragments = fragmentsByPoolType
@@ -120,7 +227,9 @@ export function resolveResponse(input: ResolveInput): ResolveOutput {
     : [];
 
   const fragment =
-    poolFragments.length > 0 ? pickFragment(poolFragments) : pickFragment(UNRECOGNIZED_FRAGMENTS);
+    poolFragments.length > 0
+      ? pickFragment(poolFragments, slots)
+      : pickFragment(UNRECOGNIZED_FRAGMENTS, slots);
 
-  return { kind: "deterministic", fragment, stateUpdate };
+  return withLapse({ kind: "deterministic", fragment, stateUpdate });
 }

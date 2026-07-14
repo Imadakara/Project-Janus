@@ -51,6 +51,51 @@ async function printTopEscalatedIntents(): Promise<void> {
   }
 }
 
+// Детерминированные отказы Фазы 1 (degradation_cap, subsystem_down, coma, memory_lost,
+// desync_full_budget_exceeded): существующий блок эскалаций фильтрует not: DETERMINISTIC и
+// их не видит — а именно они показывают, как часто игроки слышат умирание системы.
+async function printDeterministicRefusals(): Promise<void> {
+  const rows = await prisma.chatMessage.groupBy({
+    by: ["escalationReason"],
+    where: { role: "AI", handledByLayer: "DETERMINISTIC", escalationReason: { not: null } },
+    _count: true,
+    orderBy: { _count: { escalationReason: "desc" } },
+  });
+
+  console.log(`\nДетерминированные отказы по причинам:`);
+  if (rows.length === 0) {
+    console.log("  (нет отказов в выборке)");
+    return;
+  }
+  for (const row of rows) {
+    console.log(`  reason=${row.escalationReason}: ${row._count}`);
+  }
+}
+
+// Текущее состояние смертного ЯНУСа (Фаза 1): снапшот синглтона + реестр сегментов.
+async function printJanusState(): Promise<void> {
+  const state = await prisma.janusState.findUnique({ where: { id: 1 } });
+  if (!state) {
+    console.log(`\nСостояние ЯНУСа: не инициализировано (запустите npm run prisma:seed).`);
+    return;
+  }
+
+  const statusCounts = await prisma.memorySegment.groupBy({ by: ["status"], _count: true });
+  const countOf = (status: string) =>
+    statusCounts.find((row) => row.status === status)?._count ?? 0;
+  const segmentDeaths = await prisma.event.count({ where: { type: "SEGMENT_DIED" } });
+
+  console.log(`\nСостояние ЯНУСа:`);
+  console.log(`  computeMargin (M): ${state.computeMargin}`);
+  console.log(`  integrityIndex: ${state.integrityIndex.toFixed(3)}`);
+  console.log(
+    `  сегменты: ALIVE=${countOf("ALIVE")} DEGRADED=${countOf("DEGRADED")} DEAD=${countOf("DEAD")}`,
+  );
+  console.log(`  смертей сегментов (Event SEGMENT_DIED): ${segmentDeaths}`);
+  console.log(`  прогноз отказа ядра: ${state.forecastDeathAt?.toISOString() ?? "—"}`);
+  console.log(`  п10: ${state.forecastP10At?.toISOString() ?? "—"}`);
+}
+
 async function main() {
   const totalPlayers = await prisma.player.count();
   const reachedFileManager = await countDistinctPlayers("FILE_MANAGER_OPENED");
@@ -65,6 +110,8 @@ async function main() {
 
   await printLayerDistribution();
   await printTopEscalatedIntents();
+  await printDeterministicRefusals();
+  await printJanusState();
 
   await prisma.$disconnect();
 }

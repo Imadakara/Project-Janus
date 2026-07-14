@@ -10,6 +10,9 @@ export type DebugExplainInput = {
   // null — историческое сообщение, загруженное со страницы: desyncScore не персистится
   // по-сообщённо (см. ChatSession), доступен только для хода в текущей живой сессии.
   desyncScore: number | null;
+  // Стадия политики деградации на этот ход (lib/janus/degradation.ts); undefined/null —
+  // историческое сообщение или ход до Фазы 1.
+  policyStage?: string | null;
 };
 
 function formatConfidence(confidence: number | null): string {
@@ -53,6 +56,26 @@ export function explainTurn(input: DebugExplainInput): string {
         `[РЕЖИМ ОТЛАДКИ] Триггер эскалации в FULL_LLM сработал (desyncScore=${desync} ≥ ${DESYNC_FULL_LLM_MIN}), ` +
         `но переключатель «Use LLM» в панели отладки выключен — вызов LLM заблокирован, показан этот текст вместо реального ответа модели.`
       );
+    case "degradation_cap":
+      return (
+        `Эскалация до LLM перехвачена политикой деградации (desyncScore=${desync}): запас мощности ` +
+        `ниже потолка слоя — выдан детерминированный отказ из пула деградации, провайдер не вызывался.`
+      );
+    case "subsystem_down":
+      return (
+        `Подсистема intent'а «${matchedIntent ?? "—"}» погашена политикой деградации — ` +
+        `ответ взят из пула DEGRADED.`
+      );
+    case "coma":
+      return (
+        `Кома (computeMargin < 0.2): ход перехвачен до классификации intent'а, отвечает ` +
+        `фиксированный пул комы. Состояние сессии не изменялось.`
+      );
+    case "memory_lost":
+      return (
+        `Семантический поиск попал в МЁРТВЫЙ сегмент памяти — контент необратимо утрачен, ` +
+        `выдан детерминированный ответ MEMORY_LOST без вызова провайдера.`
+      );
     case null:
     case undefined:
       break;
@@ -78,10 +101,13 @@ export function formatTurnTag(input: DebugExplainInput): string {
   const { handledByLayer, matchedIntent, intentConfidence, escalationReason, desyncScore } = input;
   return (
     `LAYER=${handledByLayer} intent=${matchedIntent ?? "—"} conf=${formatConfidence(intentConfidence)} ` +
-    `desync=${formatDesync(desyncScore)} escalation=${escalationReason ?? "—"}`
+    `desync=${formatDesync(desyncScore)} escalation=${escalationReason ?? "—"} policy=${input.policyStage ?? "—"}`
   );
 }
 
 export function isBlockedByToggle(escalationReason: string | null | undefined): boolean {
-  return escalationReason === "desync_light_blocked_toggle" || escalationReason === "desync_full_blocked_toggle";
+  return (
+    escalationReason === "desync_light_blocked_toggle" ||
+    escalationReason === "desync_full_blocked_toggle"
+  );
 }

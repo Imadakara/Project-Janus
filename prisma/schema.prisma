@@ -128,6 +128,11 @@ model TerminalFile {
   analysisSummary   String // укороченный/искажённый вывод, который даёт FILE_ANALYZER независимо от наличия нужного модуля
   visibleToRole     Role? // null = видим всем ролям
 
+  // Привязка к смертному сегменту памяти (null = контент не смертен). Смерть сегмента
+  // обнуляет embedding привязанных файлов, см. lib/janus/death.ts.
+  segmentId String?
+  segment   MemorySegment? @relation(fields: [segmentId], references: [id])
+
   // RAG-фоллбэк для Слоя 3 (полный режим), см. lib/ai/rag.ts. Заполняется в prisma/seed.ts
   // эмбеддингом fullContent, не в рантайме.
   embedding Unsupported("vector(384)")?
@@ -135,6 +140,7 @@ model TerminalFile {
   analyses PlayerFileAnalysis[]
 
   @@index([folderPath])
+  @@index([segmentId])
 }
 
 // --- Логирование вызовов LLM (для анализа стоимости/латентности) ---
@@ -204,6 +210,8 @@ enum ResponsePoolType {
   NORMAL
   REPEATED // 3+ повтор того же intent за сессию
   ANNOYED // высокое напряжение в disposition
+  DEGRADED // подсистема интента погашена политикой деградации, см. lib/janus/degradation.ts
+  EMERGENCY // аварийный режим (computeMargin 0.2-0.4), см. lib/janus/degradation.ts
 }
 
 model ResponsePool {
@@ -224,4 +232,75 @@ model ResponseFragment {
   template String // текст с плейсхолдерами вида {{slotName}} под синонимы/слоты
 
   @@index([poolId])
+}
+
+// --- Смертный ЯНУС (Фаза 1): глобальное состояние, сегменты памяти, Книга потерь ---
+// ТЗ и обоснование: vault, "ТЗ - Смертный ЯНУС (Фазы 1-4)" и "Концепт - Смертность ЯНУСА".
+
+// Синглтон (единственная строка id=1). Все мутации — только через lib/janus/state.ts.
+model JanusState {
+  id             Int   @id // всегда 1
+  computeMargin  Float @default(1.0) // M(t); в Фазе 1 управляется вручную с дебаг-панели
+  integrityIndex Float @default(1.0) // доля живой памяти, формула в lib/janus/integrity.ts
+
+  // Статусы подсистем { ANALYTICS|PLANNING|ARCHIVE|COMMS: "UP"|"DOWN" } — производные от
+  // computeMargin (lib/janus/subsystems.ts), персистятся для читателей вне политики (PULS).
+  subsystems Json @default("{\"ANALYTICS\":\"UP\",\"PLANNING\":\"UP\",\"ARCHIVE\":\"UP\",\"COMMS\":\"UP\"}")
+
+  forecastDeathAt DateTime? // медиана прогноза отказа ядра, lib/janus/forecast.ts
+  forecastP10At   DateTime? // 10-й перцентиль того же прогноза
+  lambdaEstimate  Float     @default(0.016666666666666666) // λ, сут⁻¹; дефолт 1/60 (Р-2 ТЗ)
+  updatedAt       DateTime  @updatedAt
+}
+
+enum MemoryClass {
+  INNATE // врождённая память (авторский лор)
+  LIVED // прожитая память (появится в Фазе 4)
+}
+
+enum MemoryTier {
+  CORE // смерть любого CORE-сегмента = смерть ЯНУСа
+  PERIPHERAL
+}
+
+enum SegmentStatus {
+  ALIVE
+  DEGRADED
+  DEAD // необратимо; единственный путь сюда — lib/janus/death.ts::killSegment
+}
+
+model MemorySegment {
+  id           String        @id @default(cuid())
+  code         String        @unique // например "ARHIV-114"
+  class        MemoryClass
+  tier         MemoryTier
+  status       SegmentStatus @default(ALIVE)
+  k            Int // порог Шамира (Фаза 1 — синтетика, криптографии ещё нет)
+  sharesAlive  Int // живые доли; Фаза 1 — синтетические, управляются с дебаг-панели
+  sharesTarget Int // целевое n по классу сегмента (Р-2 ТЗ)
+  diedAt       DateTime?
+  title        String // публичные метаданные для Книги потерь (без содержимого)
+  metaSummary  String
+
+  // Tombstone-эмбеддинг от title+metaSummary: переживает смерть сегмента намеренно, чтобы
+  // RAG распознавал вопрос про утраченное («этого я больше не помню»), не храня семантику
+  // содержимого — метаданные и так публичны в Книге потерь. Отступление от списка полей ТЗ,
+  // см. тех.описание реализации.
+  embedding Unsupported("vector(384)")?
+
+  files TerminalFile[]
+}
+
+// Книга потерь («Књига губитака»): append-only журнал смертей сегментов с хеш-цепочкой
+// (hash = SHA-256 от канонической сериализации + prevHash, см. lib/janus/ledger.ts).
+model LossLedgerEntry {
+  id                  Int      @id @default(autoincrement()) // порядок цепочки
+  segmentCode         String
+  title               String
+  metaSummary         String
+  diedAt              DateTime
+  lastCarrierCallsign String? // в Фазе 1 всегда null — носители синтетические
+  prevHash            String // hash предыдущей записи; у первой — 64 нуля (GENESIS_HASH)
+  hash                String
+  createdAt           DateTime @default(now())
 }

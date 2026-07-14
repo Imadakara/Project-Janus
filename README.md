@@ -113,18 +113,18 @@ cp .env.example .env
 
 ## Переменные окружения (`.env`)
 
-| Переменная          | Назначение                                                                    |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `DATABASE_URL`      | Строка подключения к PostgreSQL — должна быть согласована с `POSTGRES_*` ниже |
-| `POSTGRES_USER`     | Пользователь БД (читает `docker-compose.yml`)                                 |
-| `POSTGRES_PASSWORD` | Пароль БД (читает `docker-compose.yml`)                                       |
-| `POSTGRES_DB`       | Имя БД (читает `docker-compose.yml`)                                          |
-| `POSTGRES_PORT`     | Порт, на который Postgres пробрасывается на хост (по умолчанию `5432`)        |
-| `ANTHROPIC_API_KEY` | Ключ Anthropic API — используется `ClaudeProvider` (`/lib/ai/providers`)      |
-| `AUTH_SECRET`       | Секрет для подписи сессионных JWT (сгенерировать: `openssl rand -base64 32`)  |
-| `LLM_PROVIDER`      | `claude` (по умолчанию) или `local` — активный провайдер Слоя 3               |
+| Переменная           | Назначение                                                                        |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `DATABASE_URL`       | Строка подключения к PostgreSQL — должна быть согласована с `POSTGRES_*` ниже     |
+| `POSTGRES_USER`      | Пользователь БД (читает `docker-compose.yml`)                                     |
+| `POSTGRES_PASSWORD`  | Пароль БД (читает `docker-compose.yml`)                                           |
+| `POSTGRES_DB`        | Имя БД (читает `docker-compose.yml`)                                              |
+| `POSTGRES_PORT`      | Порт, на который Postgres пробрасывается на хост (по умолчанию `5432`)            |
+| `ANTHROPIC_API_KEY`  | Ключ Anthropic API — используется `ClaudeProvider` (`/lib/ai/providers`)          |
+| `AUTH_SECRET`        | Секрет для подписи сессионных JWT (сгенерировать: `openssl rand -base64 32`)      |
+| `LLM_PROVIDER`       | `claude` (по умолчанию) или `local` — активный провайдер Слоя 3                   |
 | `LOCAL_LLM_BASE_URL` | Базовый URL self-hosted LLM (OpenAI-совместимый), только для `LLM_PROVIDER=local` |
-| `LOCAL_LLM_MODEL`    | Имя модели на self-hosted сервере, только для `LLM_PROVIDER=local`               |
+| `LOCAL_LLM_MODEL`    | Имя модели на self-hosted сервере, только для `LLM_PROVIDER=local`                |
 
 ## Скрипты
 

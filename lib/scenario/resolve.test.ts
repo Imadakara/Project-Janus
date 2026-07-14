@@ -1,13 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { resolveResponse, type ResolveInput } from "./resolve";
 import type { IntentResult } from "@/lib/intent/schema";
+import type { DegradationPolicy } from "@/lib/janus/degradation";
+import { MEMORY_LAPSE_FRAGMENTS } from "./refusal-fragments";
 import type { ScenarioSessionState } from "./types";
 import type { FragmentsByPoolType } from "./repository";
 
 const NORMAL_FRAGMENTS = ["Нормальный ответ вариант А.", "Нормальный ответ вариант Б."];
 const REPEATED_FRAGMENTS = ["Повторный ответ: вопрос уже задавался."];
+const DEGRADED_FRAGMENTS = ["Деградированный ответ: подсистема погашена."];
+const EMERGENCY_FRAGMENTS = ["Аварийный ответ: экономлю циклы."];
 
-const FRAGMENTS: FragmentsByPoolType = { NORMAL: NORMAL_FRAGMENTS, REPEATED: REPEATED_FRAGMENTS };
+const FRAGMENTS: FragmentsByPoolType = {
+  NORMAL: NORMAL_FRAGMENTS,
+  REPEATED: REPEATED_FRAGMENTS,
+  DEGRADED: DEGRADED_FRAGMENTS,
+  EMERGENCY: EMERGENCY_FRAGMENTS,
+};
+
+const NOMINAL_POLICY: DegradationPolicy = {
+  stage: "NOMINAL",
+  maxLayer: "FULL_LLM",
+  replyDelayMs: 0,
+  subsystems: { ANALYTICS: "UP", PLANNING: "UP", ARCHIVE: "UP", COMMS: "UP" },
+  forcedPool: null,
+  desyncPerTurn: 0,
+  memoryLapseProbability: 0,
+};
 
 function baseSessionState(overrides: Partial<ScenarioSessionState> = {}): ScenarioSessionState {
   return {
@@ -29,6 +48,12 @@ function baseInput(overrides: Partial<ResolveInput> = {}): ResolveInput {
     playerRole: "UNASSIGNED",
     fullLlmBudgetExceeded: false,
     fragmentsByPoolType: FRAGMENTS,
+    policy: NOMINAL_POLICY,
+    slots: {},
+    systemStateBrief: "",
+    // rng по умолчанию «никогда не проваливается» — детерминизм тестов; провалы проверяются
+    // отдельным блоком с rng: () => 0.
+    rng: () => 1,
     ...overrides,
   };
 }
@@ -140,6 +165,186 @@ describe("resolveResponse — desyncScore escalation", () => {
     if (result.kind === "deterministic") {
       expect(result.fragment).toContain("перегружен");
       expect(result.escalationReason).toBe("desync_full_budget_exceeded");
+    }
+  });
+});
+
+describe("resolveResponse — политика деградации (Фаза 1)", () => {
+  const lowConfidence: IntentResult = {
+    intent: "ASK_IDENTITY",
+    confidence: 0.1,
+    tags: [],
+    mentionedEntities: [],
+  };
+
+  it("EMERGENCY-потолок перехватывает full_llm в детерминированный отказ (degradation_cap)", () => {
+    const sessionState = baseSessionState({ desyncScore: 6, lastConfidenceTier: "low" });
+    const result = resolveResponse(
+      baseInput({
+        sessionState,
+        intentResult: lowConfidence,
+        policy: {
+          ...NOMINAL_POLICY,
+          stage: "EMERGENCY",
+          maxLayer: "LIGHT_LLM",
+          forcedPool: "EMERGENCY",
+        },
+      }),
+    );
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(result.escalationReason).toBe("degradation_cap");
+      expect(EMERGENCY_FRAGMENTS).toContain(result.fragment);
+    }
+  });
+
+  it("EMERGENCY-потолок пропускает light_llm (maxLayer = LIGHT_LLM)", () => {
+    const sessionState = baseSessionState({ desyncScore: 2, lastConfidenceTier: "medium" });
+    const result = resolveResponse(
+      baseInput({
+        sessionState,
+        intentResult: { ...lowConfidence, confidence: 0.5 },
+        policy: {
+          ...NOMINAL_POLICY,
+          stage: "EMERGENCY",
+          maxLayer: "LIGHT_LLM",
+          forcedPool: "EMERGENCY",
+        },
+      }),
+    );
+    expect(result.kind).toBe("light_llm");
+  });
+
+  it("потолок DETERMINISTIC режет и light_llm (защита в глубину при коме)", () => {
+    const sessionState = baseSessionState({ desyncScore: 3, lastConfidenceTier: "medium" });
+    const result = resolveResponse(
+      baseInput({
+        sessionState,
+        intentResult: { ...lowConfidence, confidence: 0.5 },
+        policy: { ...NOMINAL_POLICY, stage: "COMA", maxLayer: "DETERMINISTIC" },
+      }),
+    );
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(result.escalationReason).toBe("degradation_cap");
+    }
+  });
+
+  it("интент погашенной подсистемы отвечает пулом DEGRADED (subsystem_down)", () => {
+    const result = resolveResponse(
+      baseInput({
+        intentResult: { intent: "ASK_HISTORY", confidence: 0.95, tags: [], mentionedEntities: [] },
+        policy: {
+          ...NOMINAL_POLICY,
+          stage: "SUBSYSTEMS_DOWN",
+          subsystems: { ANALYTICS: "DOWN", PLANNING: "DOWN", ARCHIVE: "DOWN", COMMS: "UP" },
+        },
+      }),
+    );
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(result.escalationReason).toBe("subsystem_down");
+      expect(DEGRADED_FRAGMENTS).toContain(result.fragment);
+    }
+  });
+
+  it("интент живой подсистемы при частичной деградации отвечает как обычно", () => {
+    const result = resolveResponse(
+      baseInput({
+        intentResult: {
+          intent: "SMALLTALK_GENERIC",
+          confidence: 0.95,
+          tags: [],
+          mentionedEntities: [],
+        },
+        fragmentsByPoolType: FRAGMENTS,
+        policy: {
+          ...NOMINAL_POLICY,
+          stage: "SUBSYSTEMS_DOWN",
+          subsystems: { ANALYTICS: "DOWN", PLANNING: "UP", ARCHIVE: "UP", COMMS: "UP" },
+        },
+      }),
+    );
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(NORMAL_FRAGMENTS).toContain(result.fragment);
+      expect(result.escalationReason).toBeUndefined();
+    }
+  });
+
+  it("аварийный режим переводит обычные детерминированные ответы в пул EMERGENCY", () => {
+    const result = resolveResponse(
+      baseInput({
+        policy: {
+          ...NOMINAL_POLICY,
+          stage: "EMERGENCY",
+          maxLayer: "LIGHT_LLM",
+          forcedPool: "EMERGENCY",
+        },
+      }),
+    );
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(EMERGENCY_FRAGMENTS).toContain(result.fragment);
+    }
+  });
+
+  it("вклад памяти: desyncPerTurn добавляется даже после сброса высокой уверенностью", () => {
+    const sessionState = baseSessionState({ desyncScore: 5, lastConfidenceTier: "low" });
+    const result = resolveResponse(
+      baseInput({ sessionState, policy: { ...NOMINAL_POLICY, desyncPerTurn: 2 } }),
+    );
+    expect(result.stateUpdate.desyncScore).toBe(2);
+  });
+
+  it("«провал» памяти: rng ниже вероятности заменяет фрагмент, причина не перетирается", () => {
+    const result = resolveResponse(
+      baseInput({
+        policy: { ...NOMINAL_POLICY, memoryLapseProbability: 0.25 },
+        rng: () => 0,
+      }),
+    );
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(MEMORY_LAPSE_FRAGMENTS).toContain(result.fragment);
+      expect(result.escalationReason).toBeUndefined();
+    }
+  });
+
+  it("rng выше вероятности провала — обычный фрагмент", () => {
+    const result = resolveResponse(
+      baseInput({
+        policy: { ...NOMINAL_POLICY, memoryLapseProbability: 0.25 },
+        rng: () => 0.9,
+      }),
+    );
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(NORMAL_FRAGMENTS).toContain(result.fragment);
+    }
+  });
+
+  it("слоты подставляются в детерминированные фрагменты", () => {
+    const result = resolveResponse(
+      baseInput({
+        fragmentsByPoolType: {
+          NORMAL: ["Целостность: {{integrityIndex}}."],
+          REPEATED: [],
+          DEGRADED: [],
+          EMERGENCY: [],
+        },
+        slots: { integrityIndex: "87%" },
+      }),
+    );
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(result.fragment).toBe("Целостность: 87%.");
     }
   });
 });

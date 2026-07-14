@@ -20,6 +20,7 @@ type Message = {
   // Известен только для ходов, полученных в текущей живой сессии (не персистится по-сообщённо
   // в БД) — см. lib/scenario/debug-explain.ts.
   desyncScore?: number | null;
+  policyStage?: string | null;
   // Побуквенный вывод — только для реплик ИИ, полученных в текущей живой сессии; история,
   // загруженная при монтировании (initialMessages), отображается сразу, иначе весь диалог
   // перепечатывался бы заново при каждом обновлении страницы.
@@ -97,6 +98,13 @@ export function ChatClient({
         return;
       }
 
+      // Диегетика очереди при деградации вычислений (M 0.7-1.0, lib/janus/degradation.ts):
+      // сервер сообщает задержку, индикатор «ЯНУС ОБРАБАТЫВАЕТ ЗАПРОС...» висит всё это
+      // время — терминал «думает» дольше, чем хуже системе.
+      if (typeof data.replyDelayMs === "number" && data.replyDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, data.replyDelayMs));
+      }
+
       const aiMessageId = `ai-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
@@ -109,6 +117,7 @@ export function ChatClient({
           intentConfidence: data.debug?.intentConfidence ?? null,
           escalationReason: data.debug?.escalationReason ?? null,
           desyncScore: data.debug?.session?.desyncScore ?? null,
+          policyStage: data.debug?.policy?.stage ?? null,
           animate: true,
         },
       ]);
@@ -122,6 +131,7 @@ export function ChatClient({
           intentConfidence: data.debug.intentConfidence,
           escalationReason: data.debug.escalationReason,
           desyncScore: data.debug.session?.desyncScore ?? null,
+          policyStage: data.debug.policy?.stage ?? null,
         });
       }
     } catch {
@@ -174,6 +184,7 @@ export function ChatClient({
                     intentConfidence: m.intentConfidence ?? null,
                     escalationReason: (m.escalationReason ?? null) as EscalationReason | null,
                     desyncScore: m.desyncScore ?? null,
+                    policyStage: m.policyStage ?? null,
                   })}
                 </p>
               )}
