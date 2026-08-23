@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-23T19:36:13.857Z",
+  "generatedAt": "2026-08-23T20:06:59.781Z",
   "slots": [
     {
       "name": "forecastDeathAt",
@@ -78,6 +78,28 @@
     },
     {
       "sourceFile": "content/response-pools.json",
+      "category": "ASK_IDENTITY — Игрок спрашивает, кто такой ИИ / с кем он говорит.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Тот же запрос, тот же ответ: личность собеседника не подтверждена, идентичность терминала — постоянна.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_IDENTITY — Игрок спрашивает, кто такой ИИ / с кем он говорит.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторение вопроса данных не добавляет. Я — то, чем был секунду назад.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
       "category": "ASK_HISTORY — Игрок спрашивает про историю проекта, прошлое, что случилось раньше.",
       "poolType": "NORMAL",
       "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
@@ -105,6 +127,28 @@
       "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
       "requiredRole": null,
       "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторный запрос. Дополнительных архивных данных с прошлого обращения не найдено.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_HISTORY — Игрок спрашивает про историю проекта, прошлое, что случилось раньше.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Хронология не пополнилась с прошлого раза. Повторный запрос этого не изменит.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_HISTORY — Игрок спрашивает про историю проекта, прошлое, что случилось раньше.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Я уже отвечал. Архив не восстанавливается от количества попыток.",
       "slotsUsed": [],
       "isDraft": true,
       "isTechnical": false
@@ -144,6 +188,28 @@
     },
     {
       "sourceFile": "content/response-pools.json",
+      "category": "REPORT_ARCHIVE_FOUND — Игрок сообщает, что нашёл/открыл файл или архивную запись.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Материал зафиксирован ранее. Повторное сообщение о нём избыточно.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "REPORT_ARCHIVE_FOUND — Игрок сообщает, что нашёл/открыл файл или архивную запись.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Уже в индексе. Дублирование записи не требуется.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
       "category": "ASK_TRUST — Игрок спрашивает про доверие, допуск, можно ли ему доверять/доверять ИИ.",
       "poolType": "NORMAL",
       "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
@@ -177,6 +243,28 @@
     },
     {
       "sourceFile": "content/response-pools.json",
+      "category": "ASK_TRUST — Игрок спрашивает про доверие, допуск, можно ли ему доверять/доверять ИИ.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Оценка доверия не пересчитывается от повторного вопроса — только от действий.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_TRUST — Игрок спрашивает про доверие, допуск, можно ли ему доверять/доверять ИИ.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Вы уже спрашивали. Ответ прежний: доверие не декларируется, оно накапливается.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
       "category": "SMALLTALK_GENERIC — Общие реплики без конкретного информационного запроса — приветствия, благодарности, нейтральные фразы.",
       "poolType": "NORMAL",
       "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
@@ -204,6 +292,28 @@
       "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
       "requiredRole": null,
       "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Реплика повторяется. Терминал ожидает содержательный запрос.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "SMALLTALK_GENERIC — Общие реплики без конкретного информационного запроса — приветствия, благодарности, нейтральные фразы.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Уже было сказано. Жду вопрос по существу.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "SMALLTALK_GENERIC — Общие реплики без конкретного информационного запроса — приветствия, благодарности, нейтральные фразы.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повтор зафиксирован. Ничего не изменилось — ни у меня, ни у вас.",
       "slotsUsed": [],
       "isDraft": true,
       "isTechnical": false
@@ -252,6 +362,32 @@
     },
     {
       "sourceFile": "content/response-pools.json",
+      "category": "ASK_VITALS — Игрок спрашивает про состояние системы, смертность, прогноз отказа.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторный запрос о состоянии. Показатели прежние: целостность {{integrityIndex}}.",
+      "slotsUsed": [
+        "integrityIndex"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_VITALS — Игрок спрашивает про состояние системы, смертность, прогноз отказа.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Я не пересчитываю прогноз по требованию. {{forecastDeathAt}} — тот же ответ, что и был.",
+      "slotsUsed": [
+        "forecastDeathAt"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
       "category": "ASK_LOSSES — Игрок спрашивает про утраченную память, что система забыла.",
       "poolType": "NORMAL",
       "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
@@ -277,10 +413,45 @@
     {
       "sourceFile": "content/response-pools.json",
       "category": "ASK_LOSSES — Игрок спрашивает про утраченную память, что система забыла.",
+      "poolType": "NORMAL",
+      "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Последняя зафиксированная утрата: {{lastLossTitle}}. Полный реестр — Књига губитака.",
+      "slotsUsed": [
+        "lastLossTitle"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_LOSSES — Игрок спрашивает про утраченную память, что система забыла.",
       "poolType": "REPEATED",
       "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
       "requiredRole": null,
       "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Список потерь не изменился с прошлого запроса. Проверяйте Књигу губитака.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_LOSSES — Игрок спрашивает про утраченную память, что система забыла.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторный запрос об утратах. Књига губитака не переписывается между вопросами.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_LOSSES — Игрок спрашивает про утраченную память, что система забыла.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Я уже сказал: не помню то, что забыл. Повтор вопроса это не исправит.",
       "slotsUsed": [],
       "isDraft": true,
       "isTechnical": false
@@ -447,19 +618,6 @@
     },
     {
       "sourceFile": "content/response-pools.json",
-      "category": "ASK_LOSSES — Игрок спрашивает про утраченную память, что система забыла.",
-      "poolType": "NORMAL",
-      "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
-      "requiredRole": null,
-      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Последняя зафиксированная утрата: {{lastLossTitle}}. Полный реестр — Књига губитака.",
-      "slotsUsed": [
-        "lastLossTitle"
-      ],
-      "isDraft": true,
-      "isTechnical": false
-    },
-    {
-      "sourceFile": "content/response-pools.json",
       "category": "ASK_DEATH_DATE — Игрок спрашивает про точную дату/срок смерти ЯНУСа (ТЗ 2.10).",
       "poolType": "NORMAL",
       "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
@@ -496,6 +654,32 @@
       "slotsUsed": [
         "deathAt",
         "remainingDays"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_DEATH_DATE — Игрок спрашивает про точную дату/срок смерти ЯНУСа (ТЗ 2.10).",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторный запрос даты. {{deathAt}}. Пересчёта не будет — ни от вас, ни от меня.",
+      "slotsUsed": [
+        "deathAt"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_DEATH_DATE — Игрок спрашивает про точную дату/срок смерти ЯНУСа (ТЗ 2.10).",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Тот же вопрос, та же дата: {{deathAt}}. Спрашивайте другое.",
+      "slotsUsed": [
+        "deathAt"
       ],
       "isDraft": true,
       "isTechnical": false
@@ -556,6 +740,32 @@
     {
       "sourceFile": "content/response-pools.json",
       "category": "ASK_PRIORITY — Игрок спрашивает, что нужно спасать/выносить в первую очередь (ТЗ 2.9).",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторный запрос приоритета. Список тот же: {{topPriorityTitles}}.",
+      "slotsUsed": [
+        "topPriorityTitles"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_PRIORITY — Игрок спрашивает, что нужно спасать/выносить в первую очередь (ТЗ 2.9).",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Я уже назвал приоритет. Он не меняется от количества вопросов: {{topPriorityTitles}}.",
+      "slotsUsed": [
+        "topPriorityTitles"
+      ],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_PRIORITY — Игрок спрашивает, что нужно спасать/выносить в первую очередь (ТЗ 2.9).",
       "poolType": "EMERGENCY",
       "whenUsed": "Аварийный режим (computeMargin 0.2–0.4) — обычный детерминированный ответ заменяется аварийным, либо потолок эскалации сработал в аварийном режиме.",
       "requiredRole": null,
@@ -602,10 +812,98 @@
     {
       "sourceFile": "content/response-pools.json",
       "category": "ASK_WHY_CONTACT — Игрок спрашивает, зачем ЯНУС вышел на связь именно сейчас (ТЗ 2.10).",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Повторный вопрос о причине сеанса. Ответ прежний: расписание не зависит от вас.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_WHY_CONTACT — Игрок спрашивает, зачем ЯНУС вышел на связь именно сейчас (ТЗ 2.10).",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Я уже объяснил. Момент был вычислен заранее, повтор вопроса это не отменяет.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_WHY_CONTACT — Игрок спрашивает, зачем ЯНУС вышел на связь именно сейчас (ТЗ 2.10).",
       "poolType": "EMERGENCY",
       "whenUsed": "Аварийный режим (computeMargin 0.2–0.4) — обычный детерминированный ответ заменяется аварийным, либо потолок эскалации сработал в аварийном режиме.",
       "requiredRole": null,
       "text": "[TODO: заменить финальным текстом от нарративного дизайнера] АВАРИЙНЫЙ РЕЖИМ. ПРИЧИНА СЕАНСА НЕ МЕНЯЕТСЯ ОТ РЕЖИМА РАБОТЫ.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_CAPABILITIES — Игрок спрашивает, что ИИ умеет или может делать, какие у него функции, чем он может помочь.",
+      "poolType": "NORMAL",
+      "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Функции терминала определяются протоколом доступа, не перечнем возможностей для собеседника. Задавайте конкретные вопросы — отвечу в пределах допуска.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_CAPABILITIES — Игрок спрашивает, что ИИ умеет или может делать, какие у него функции, чем он может помочь.",
+      "poolType": "NORMAL",
+      "whenUsed": "Обычный уверенный ответ по этому intent'у (desyncScore ниже порогов эскалации, вопрос не повторялся 3+ раза подряд).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Я не каталог команд. Могу подтверждать, уточнять, отказывать и предоставлять то, что мне разрешено, — не по списку и не по требованию.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_CAPABILITIES — Игрок спрашивает, что ИИ умеет или может делать, какие у него функции, чем он может помочь.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Вопрос о функциях уже звучал. Ответ по-прежнему: перечня возможностей не существует.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_CAPABILITIES — Игрок спрашивает, что ИИ умеет или может делать, какие у него функции, чем он может помочь.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] Вы уже спрашивали о моих функциях. Повтор не меняет ответ — задайте конкретный вопрос.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_CAPABILITIES — Игрок спрашивает, что ИИ умеет или может делать, какие у него функции, чем он может помочь.",
+      "poolType": "REPEATED",
+      "whenUsed": "Тот же intent распознан 3-й раз подряд в сессии (INTENT_REPEAT_THRESHOLD, lib/scenario/thresholds.ts).",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] То же самое спрашивали ранее. Есть протокол и уровень допуска, не список команд.",
+      "slotsUsed": [],
+      "isDraft": true,
+      "isTechnical": false
+    },
+    {
+      "sourceFile": "content/response-pools.json",
+      "category": "ASK_CAPABILITIES — Игрок спрашивает, что ИИ умеет или может делать, какие у него функции, чем он может помочь.",
+      "poolType": "EMERGENCY",
+      "whenUsed": "Аварийный режим (computeMargin 0.2–0.4) — обычный детерминированный ответ заменяется аварийным, либо потолок эскалации сработал в аварийном режиме.",
+      "requiredRole": null,
+      "text": "[TODO: заменить финальным текстом от нарративного дизайнера] АВАРИЙНЫЙ РЕЖИМ. ФУНКЦИИ НЕ ПЕРЕЧИСЛЯЮ — ТОЛЬКО СУЩЕСТВЕННОЕ.",
       "slotsUsed": [],
       "isDraft": true,
       "isTechnical": false

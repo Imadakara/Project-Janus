@@ -13,6 +13,7 @@ describe("needsRagSearch", () => {
 
   it("intent про системное состояние/характер ЯНУСа — RAG пропускается", () => {
     expect(needsRagSearch("ASK_IDENTITY")).toBe(false);
+    expect(needsRagSearch("ASK_CAPABILITIES")).toBe(false);
     expect(needsRagSearch("ASK_TRUST")).toBe(false);
     expect(needsRagSearch("SMALLTALK_GENERIC")).toBe(false);
     expect(needsRagSearch("ASK_VITALS")).toBe(false);

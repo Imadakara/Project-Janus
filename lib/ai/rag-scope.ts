@@ -13,6 +13,7 @@
 // вопрос вероятнее всего об архивных материалах.
 const RAG_SKIP_INTENTS = new Set<string>([
   "ASK_IDENTITY",
+  "ASK_CAPABILITIES",
   "ASK_TRUST",
   "SMALLTALK_GENERIC",
   "ASK_VITALS",

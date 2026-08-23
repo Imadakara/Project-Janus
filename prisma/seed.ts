@@ -276,6 +276,25 @@ async function main() {
     }
   }
 
+  // Два JSON-объекта с одинаковым (intentCode, type, requiredRole) молча портят друг друга
+  // ниже: findFirst находит пул, созданный первым объектом, и его фрагменты полностью
+  // перезаписываются вторым — контент первого объекта пропадает без единой ошибки (так и
+  // произошло с ASK_LOSSES/NORMAL до этой правки: 2 фрагмента общего NORMAL-объекта были
+  // молча стёрты вторым, отдельным NORMAL-объектом с {{lastLossTitle}}). Считаем это
+  // ошибкой контента, а не "последний объект побеждает" — при дубле сид должен падать
+  // сразу и явно, а не потерять кусок content/response-pools.json без следа.
+  const poolKeys = new Set<string>();
+  for (const poolDef of responsePoolsData.pools) {
+    const key = `${poolDef.intentCode}:${poolDef.type}:${poolDef.requiredRole ?? "null"}`;
+    if (poolKeys.has(key)) {
+      throw new Error(
+        `content/response-pools.json: дублирующийся пул (intentCode+type+requiredRole) — ${key}. ` +
+          `Объедините фрагменты в один объект, иначе один из них молча перезапишет другой.`,
+      );
+    }
+    poolKeys.add(key);
+  }
+
   let poolCount = 0;
   let fragmentCount = 0;
 
