@@ -14,8 +14,16 @@ export type PromptBuilderOptions = {
   ragResults?: RagResult[];
 };
 
-const MAX_TOKENS_LIGHT = 300;
-const MAX_TOKENS_FULL = 600;
+// Бюджет генерации, не длина ответа игроку — guards.ts (applyGuards → truncateToMaxSentences)
+// обрезает text ПОСЛЕ генерации, до maxSentences (2 light / 4 full, generation-task.ts). До
+// этой правки бюджет был кратно больше того, что реально доходит до игрока (живые прогоны:
+// ~70 completion-токенов на 2 предложения, ~140 на 4, см. лог live-теста локальной LLM,
+// experiments/llm-bench/), а маленькие локальные модели (в отличие от Claude) плохо держат
+// инструкцию «не длиннее N предложений» и генерят вплоть до лимита — на CPU decode
+// последовательный, поэтому лишний бюджет — это не подстраховка, а прямая потеря времени.
+// Значения ниже — вдвое туже прежних (300/600), с ~2x запасом над наблюдаемым расходом.
+const MAX_TOKENS_LIGHT = 150;
+const MAX_TOKENS_FULL = 300;
 
 // Разворачивает GenerationTask в компактный system-prompt. Для лёгкого режима — без
 // истории/лора, только базовый характер (существующий buildSystemPrompt) + задача +

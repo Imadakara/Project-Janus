@@ -17,10 +17,12 @@ import type { EscalationReason, ResolveStateUpdate, ScenarioSessionState } from 
 // Заглушки на случай, когда intent не распознан вовсе (нет ResponsePool для null) или
 // когда бюджет full_llm исчерпан — фиксированный внутриигровой отказ вместо тихого
 // отказа в обслуживании. TODO: заменить финальным текстом от нарративного дизайнера.
-const UNRECOGNIZED_FRAGMENTS = [
+// Экспортированы (не module-private) — единственный источник истины для
+// scripts/export-response-catalog.ts, не дублировать эти строки больше нигде.
+export const UNRECOGNIZED_FRAGMENTS = [
   "[TODO: заменить финальным текстом от нарративного дизайнера] Запрос не распознан. Уточните формулировку.",
 ];
-const BUDGET_REFUSAL_FRAGMENTS = [
+export const BUDGET_REFUSAL_FRAGMENTS = [
   "[TODO: заменить финальным текстом от нарративного дизайнера] Канал связи перегружен. Дальнейшие запросы временно отклоняются.",
 ];
 

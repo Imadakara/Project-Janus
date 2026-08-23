@@ -10,8 +10,9 @@ function truncateToMaxSentences(text: string, maxSentences: number): string {
 // Защита в глубину: секреты и так не должны попадать в контекст, это подстраховка на
 // случай, если модель домыслит запрещённую тему. При совпадении заменяем ВЕСЬ ответ на
 // общую внутриигровую отговорку — точечная редактура рискует оставить куски контекста,
-// намекающие на то же самое.
-const DEFLECTION_FRAGMENT =
+// намекающие на то же самое. Экспортирован ради scripts/export-response-catalog.ts — не
+// дублировать эту строку больше нигде.
+export const DEFLECTION_FRAGMENT =
   "[TODO: заменить финальным текстом от нарративного дизайнера] Этот вопрос выходит за рамки того, что я готов обсуждать.";
 
 export function applyGuards(text: string, task: GenerationTask): string {

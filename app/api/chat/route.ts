@@ -8,7 +8,8 @@ import { isChatRateLimited, isFullLlmBudgetExceeded } from "@/lib/ai/rate-limit"
 import { getLlmProvider, LocalLlmTimeoutError, type LlmSource } from "@/lib/ai/providers";
 import { buildPrompt } from "@/lib/ai/prompt-builder";
 import { applyGuards } from "@/lib/ai/guards";
-import { searchUnlockedMaterials } from "@/lib/ai/rag";
+import { searchUnlockedMaterials, type RagSearchOutcome } from "@/lib/ai/rag";
+import { needsRagSearch } from "@/lib/ai/rag-scope";
 import { trackEvent } from "@/lib/analytics/track";
 import { classifyIntent } from "@/lib/intent/classify";
 import { recomputeDerivedState } from "@/lib/janus/state";
@@ -234,19 +235,24 @@ export async function POST(request: Request) {
       handledByLayer = "FULL_LLM";
       escalationReason = resolution.escalationReason;
 
+      // Слой 2 уже классифицировал intent — для тем, заведомо не про содержимое архива
+      // (характер ЯНУСа, системное состояние/календарь), RAG не запускается вовсе: экономит
+      // эмбеддинг + 2 похода в БД и не подсовывает модели нерелевантный сниппет не по теме.
+      // См. lib/ai/rag-scope.ts. Нераспознанный intent (null) — безопасный дефолт, RAG всё
+      // равно выполняется.
+      const ragNeeded = needsRagSearch(intentResult.intent);
+
       const [unlockedModuleKeys, recentHistory] = await Promise.all([
-        getUnlockedModuleKeys(player.id),
+        ragNeeded ? getUnlockedModuleKeys(player.id) : Promise.resolve<string[]>([]),
         prisma.chatMessage.findMany({
           where: { sessionId: session.id },
           orderBy: { createdAt: "desc" },
           take: HISTORY_LIMIT,
         }),
       ]);
-      const ragOutcome = await searchUnlockedMaterials(
-        playerMessage,
-        unlockedModuleKeys,
-        player.role,
-      );
+      const ragOutcome: RagSearchOutcome = ragNeeded
+        ? await searchUnlockedMaterials(playerMessage, unlockedModuleKeys, player.role)
+        : { kind: "hits", results: [] };
 
       // Вопрос попал в мёртвый сегмент памяти: детерминированный ответ MEMORY_LOST без
       // вызова провайдера — по тому же паттерну перехвата, что тумблер «Use LLM» выше

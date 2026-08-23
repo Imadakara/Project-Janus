@@ -274,6 +274,9 @@ describe("POST /api/chat", () => {
   });
 
   it("calls the LLM provider in full mode with history and RAG results", async () => {
+    // ASK_HISTORY — намеренно не в deny-list lib/ai/rag-scope.ts (вопрос вероятно про
+    // архивные материалы), иначе RAG для этого теста не вызвался бы вовсе.
+    mockClassifyIntent.mockResolvedValue({ ...INTENT_RESULT, intent: "ASK_HISTORY" });
     mockResolveResponse.mockReturnValue({
       kind: "full_llm",
       task: {
@@ -294,6 +297,33 @@ describe("POST /api/chat", () => {
     expect(mockSearchUnlockedMaterials).toHaveBeenCalledOnce();
     expect(mockChatMessageFindMany).toHaveBeenCalledOnce();
     expect(mockLlmCallLogCreate).toHaveBeenCalledOnce();
+  });
+
+  it("full-режим пропускает RAG для intent'а из deny-list (lib/ai/rag-scope.ts)", async () => {
+    // INTENT_RESULT по умолчанию — ASK_IDENTITY, он в deny-list: вопрос о характере ЯНУСа,
+    // не о содержимом архива.
+    mockResolveResponse.mockReturnValue({
+      kind: "full_llm",
+      task: {
+        tone: "x",
+        forbiddenTopics: [],
+        allowedHints: [],
+        maxSentences: 4,
+        fewShotExamples: [],
+      },
+      stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
+      escalationReason: "desync_full",
+    });
+
+    const res = await POST(makeRequest("кто ты?"));
+    const data = await res.json();
+
+    expect(data.message).toBe("ответ ИИ");
+    expect(mockSearchUnlockedMaterials).not.toHaveBeenCalled();
+    expect(mockGetUnlockedModuleKeys).not.toHaveBeenCalled();
+    // История диалога всё равно нужна модели — RAG и история не связаны.
+    expect(mockChatMessageFindMany).toHaveBeenCalledOnce();
+    expect(mockGenerate).toHaveBeenCalledOnce();
   });
 
   it("passes fullLlmBudgetExceeded through to resolveResponse", async () => {
@@ -513,6 +543,9 @@ describe("POST /api/chat", () => {
   });
 
   it("маркер утраты из RAG перехватывает full_llm в MEMORY_LOST без вызова провайдера", async () => {
+    // ASK_HISTORY — см. комментарий в тесте выше, иначе RAG (а с ним и маркер "lost") не
+    // сработал бы вовсе.
+    mockClassifyIntent.mockResolvedValue({ ...INTENT_RESULT, intent: "ASK_HISTORY" });
     mockResolveResponse.mockReturnValue({
       kind: "full_llm",
       task: {
@@ -549,7 +582,13 @@ describe("POST /api/chat", () => {
       mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
       mockResolveResponse.mockReturnValue({
         kind: "light_llm",
-        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        task: {
+          tone: "x",
+          forbiddenTopics: [],
+          allowedHints: [],
+          maxSentences: 2,
+          fewShotExamples: [],
+        },
         stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
         escalationReason: "desync_light",
       });
@@ -562,7 +601,13 @@ describe("POST /api/chat", () => {
     it("игнорирует llmSource=local для не-дебаг игрока — провайдер вызывается без override", async () => {
       mockResolveResponse.mockReturnValue({
         kind: "light_llm",
-        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        task: {
+          tone: "x",
+          forbiddenTopics: [],
+          allowedHints: [],
+          maxSentences: 2,
+          fewShotExamples: [],
+        },
         stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
         escalationReason: "desync_light",
       });
@@ -636,7 +681,13 @@ describe("POST /api/chat", () => {
     it("таймаут локальной LLM в light-режиме отдаёт техническую заглушку вместо 502", async () => {
       mockResolveResponse.mockReturnValue({
         kind: "light_llm",
-        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        task: {
+          tone: "x",
+          forbiddenTopics: [],
+          allowedHints: [],
+          maxSentences: 2,
+          fewShotExamples: [],
+        },
         stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
         escalationReason: "desync_light",
       });
@@ -662,7 +713,13 @@ describe("POST /api/chat", () => {
     it("таймаут локальной LLM в full-режиме отдаёт техническую заглушку вместо 502", async () => {
       mockResolveResponse.mockReturnValue({
         kind: "full_llm",
-        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 4, fewShotExamples: [] },
+        task: {
+          tone: "x",
+          forbiddenTopics: [],
+          allowedHints: [],
+          maxSentences: 4,
+          fewShotExamples: [],
+        },
         stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
         escalationReason: "desync_full",
       });
@@ -687,7 +744,13 @@ describe("POST /api/chat", () => {
     it("прочие ошибки провайдера (не таймаут) по-прежнему отдают 502", async () => {
       mockResolveResponse.mockReturnValue({
         kind: "light_llm",
-        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        task: {
+          tone: "x",
+          forbiddenTopics: [],
+          allowedHints: [],
+          maxSentences: 2,
+          fewShotExamples: [],
+        },
         stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
         escalationReason: "desync_light",
       });

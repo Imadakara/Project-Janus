@@ -12,6 +12,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "metrics": "tsx scripts/metrics.ts",
     "generate-schedule": "tsx scripts/generate-schedule.ts",
+    "export-response-catalog": "tsx scripts/export-response-catalog.ts",
     "test": "vitest run"
   },
   "prisma": {
