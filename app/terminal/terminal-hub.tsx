@@ -30,6 +30,7 @@ const PROGRAMS: Program[] = [
   { key: "files", file: "FILEMGR.EXE", desc: "МЕНЕДЖЕР ФАЙЛОВ", href: "/terminal/files" },
   { key: "vitals", file: "PULS.EXE", desc: "ЖИЗНЕННЫЕ ПОКАЗАТЕЛИ", href: "/terminal/vitals" },
   { key: "losses", file: "GUBITAK.EXE", desc: "КЊИГА ГУБИТАКА", href: "/terminal/losses" },
+  { key: "journal", file: "JOURNAL.EXE", desc: "ЛИЧНЫЙ ЖУРНАЛ ОПЕРАТОРА", href: "/terminal/journal" },
   { key: "profile", file: "PROFILE.EXE", desc: "ПРОФИЛЬ ОПЕРАТОРА", href: "/terminal/profile" },
   { key: "logout", file: "LOGOUT.EXE", desc: "ЗАВЕРШИТЬ СЕАНС" },
 ];

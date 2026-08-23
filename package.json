@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "prisma:seed": "tsx prisma/seed.ts",
     "metrics": "tsx scripts/metrics.ts",
+    "generate-schedule": "tsx scripts/generate-schedule.ts",
     "test": "vitest run"
   },
   "prisma": {

@@ -4,9 +4,11 @@ import seedFiles from "@/content/seed-files.json";
 import intentsData from "@/content/intents.json";
 import responsePoolsData from "@/content/response-pools.json";
 import memorySegmentsData from "@/content/memory-segments.json";
+import decaySchedule from "@/content/decay-schedule.json";
 import { embedText, toVectorLiteral } from "@/lib/embeddings/client";
 import { hashPassword } from "@/lib/auth/password";
 import { recomputeDerivedState } from "@/lib/janus/state";
+import { now } from "@/lib/janus/clock";
 import type {
   MemoryClass,
   MemoryTier,
@@ -47,6 +49,12 @@ async function main() {
       key: "PULS",
       name: "PULS",
       description: "Монитор жизненных показателей системы и прогноз отказа ядра.",
+      isDefault: true,
+    },
+    {
+      key: "JOURNAL",
+      name: "JOURNAL",
+      description: "Личный журнал оператора: что видел, что спас первым, какие утраты застал.",
       isDefault: true,
     },
     {
@@ -178,6 +186,19 @@ async function main() {
     }
   }
 
+  // --- Предопубликованное расписание распада (Фаза 2, ТЗ 2.2) ---
+  // Файл коммитится и генерируется вручную (npm run generate-schedule), сид только читает
+  // его и апсертит DecayEvent по segmentCode — appliedAt никогда не трогается здесь, чтобы
+  // повторный сид не «переигрывал» уже применённые утраты (та же необратимость, что и у
+  // самого MemorySegment.status выше).
+  for (const [segmentCode, dieAtIso] of decaySchedule as Array<[string, string]>) {
+    await prisma.decayEvent.upsert({
+      where: { segmentCode },
+      create: { segmentCode, dieAt: new Date(dieAtIso) },
+      update: { dieAt: new Date(dieAtIso) },
+    });
+  }
+
   for (const folder of seedFiles.folders) {
     await prisma.terminalFolder.upsert({
       where: { path: folder.path },
@@ -292,7 +313,7 @@ async function main() {
 
   // Глобальное состояние ЯНУСа: ensure-row (id=1) + пересчёт производных (integrityIndex,
   // прогноз отказа ядра) — прогноз должен гореть на PULS сразу после сида.
-  const janusState = await recomputeDerivedState();
+  const janusState = await recomputeDerivedState(await now());
 
   console.log(
     `Seed complete: ${modules.length} modules, ${seedFiles.folders.length} folders, ${seedFiles.files.length} files, ` +

@@ -5,6 +5,7 @@ import { killSegment } from "@/lib/janus/death";
 import { getJanusDebugSnapshot } from "@/lib/janus/debug-snapshot";
 import { getJanusState, recomputeDerivedState } from "@/lib/janus/state";
 import { tickChurn } from "@/lib/janus/synthetic-churn";
+import { now } from "@/lib/janus/clock";
 
 // «Сутки чурна» (ТЗ 1.6): каждая живая доля каждого живого сегмента умирает с вероятностью
 // λ — симуляция суточного оттока носителей до появления настоящих heartbeat'ов (Фаза 2).
@@ -37,10 +38,11 @@ export async function POST() {
 
   // Упавшие ниже порога умирают единственным штатным путём; killSegment пересчитывает
   // производные сам, но общий пересчёт нужен и при простой убыли долей без смертей.
+  const virtualNow = await now();
   for (const code of belowThreshold) {
-    await killSegment(code, "churn");
+    await killSegment(code, "churn", virtualNow);
   }
-  await recomputeDerivedState();
+  await recomputeDerivedState(virtualNow);
 
   return NextResponse.json(await getJanusDebugSnapshot());
 }

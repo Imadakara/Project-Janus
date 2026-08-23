@@ -3,17 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-// Экран PULS.EXE — монитор жизненных показателей (ТЗ 1.5). Поллинг вместо SSE (вне рамок
-// фазы): дата отказа обязана сдвигаться на глазах при действиях с дебаг-панели.
+// Экран PULS.EXE — монитор жизненных показателей (ТЗ 1.5, переработан Фазой 2 — 2.5).
+// Поллинг вместо SSE (вне рамок фазы): дата отказа зафиксирована и не сдвигается сама по
+// себе, но сегменты/подсистемы меняются от действий с дебаг-панели, и это обязано быть
+// видно на глазах.
 const POLL_INTERVAL_MS = 5000;
 
 type SubsystemStatus = "UP" | "DOWN";
 
 type VitalsData = {
   computeMargin: number;
+  computeMarginOverride: boolean;
   integrityIndex: number;
   subsystems: Record<string, SubsystemStatus>;
-  forecast: { deathAt: string | null; p10At: string | null; lambda: number; coreDead: boolean };
+  countdown: { deathAt: string; remainingMs: number; isDead: boolean; coreDead: boolean };
+  salvage: { total: number; salvaged: number; percent: number };
+  lossCount: number;
+  degradingSegments: Array<{ code: string; title: string; dieAt: string | null }>;
   coreSegments: Array<{
     code: string;
     title: string;
@@ -36,6 +42,16 @@ function formatDate(iso: string): string {
   return `${dd}.${mm}.${date.getUTCFullYear()} ${hh}:${mi}`;
 }
 
+function formatRemaining(ms: number): string {
+  if (ms <= 0) return "00:00:00:00";
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days} СУТ ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
@@ -50,6 +66,9 @@ const SUBSYSTEM_LABELS: Record<string, string> = {
 export function VitalsScreen() {
   const [data, setData] = useState<VitalsData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Тикающий локально остаток — пересчитывается от последнего серверного remainingMs, чтобы
+  // отсчёт не «стоял на месте» между poll'ами (сервер опрашивается раз в 5с, тикер — раз в с).
+  const [localRemainingMs, setLocalRemainingMs] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +83,7 @@ export function VitalsScreen() {
           return;
         }
         setData(payload);
+        setLocalRemainingMs(payload.countdown.remainingMs);
         setError(null);
       } catch {
         if (!cancelled) setError("ОШИБКА СВЯЗИ.");
@@ -77,6 +97,15 @@ export function VitalsScreen() {
       clearInterval(timer);
     };
   }, []);
+
+  const hasLocalRemaining = localRemainingMs !== null;
+  useEffect(() => {
+    if (!hasLocalRemaining) return;
+    const tick = setInterval(() => {
+      setLocalRemainingMs((ms) => (ms === null ? null : Math.max(0, ms - 1000)));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [hasLocalRemaining]);
 
   return (
     <main className="flex min-h-screen flex-col gap-6 px-6 py-8 sm:px-12">
@@ -97,32 +126,40 @@ export function VitalsScreen() {
       {data && (
         <>
           <section className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
-            <p className="mb-2 opacity-70">— ПРОГНОЗ ОТКАЗА ЯДРА —</p>
-            {data.forecast.coreDead ? (
-              <p className="text-lg">ОТКАЗ ЯДРА ЗАФИКСИРОВАН. ПРОГНОЗ НЕ ВЕДЁТСЯ.</p>
-            ) : data.forecast.deathAt ? (
-              <>
-                <p className="text-lg">{formatDate(data.forecast.deathAt)}</p>
-                {data.forecast.p10At && (
-                  <p className="opacity-70">
-                    С ВЕРОЯТНОСТЬЮ 10% — РАНЬШЕ {formatDate(data.forecast.p10At)}
-                  </p>
-                )}
-              </>
+            <p className="mb-2 opacity-70">— ВРЕМЯ ДО ОТКАЗА —</p>
+            {data.countdown.coreDead ? (
+              <p className="text-lg">ОТКАЗ ЯДРА ЗАФИКСИРОВАН.</p>
+            ) : data.countdown.isDead ? (
+              <p className="text-lg">СРОК ИСТЁК.</p>
             ) : (
-              <p className="text-lg">ПРОГНОЗ НЕ ОПРЕДЕЛЁН.</p>
+              <>
+                <p className="text-2xl">{formatRemaining(localRemainingMs ?? data.countdown.remainingMs)}</p>
+                <p className="opacity-70">ДАТА ОТКАЗА: {formatDate(data.countdown.deathAt)}</p>
+              </>
             )}
-            <p className="mt-2 opacity-70">λ = {data.forecast.lambda.toFixed(5)} СУТ⁻¹</p>
           </section>
 
           <section className="flex flex-wrap gap-6">
             <div className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
               <p className="opacity-70">ЗАПАС МОЩНОСТИ</p>
-              <p className="text-lg">{percent(data.computeMargin)}</p>
+              <p className="text-lg">
+                {percent(data.computeMargin)}
+                {data.computeMarginOverride && <span className="opacity-70"> (РУЧНОЙ РЕЖИМ)</span>}
+              </p>
             </div>
             <div className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
               <p className="opacity-70">ЦЕЛОСТНОСТЬ ПАМЯТИ</p>
               <p className="text-lg">{percent(data.integrityIndex)}</p>
+            </div>
+            <div className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
+              <p className="opacity-70">СПАСЕНО</p>
+              <p className="text-lg">
+                {percent(data.salvage.percent)} ({data.salvage.salvaged}/{data.salvage.total})
+              </p>
+            </div>
+            <div className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
+              <p className="opacity-70">УТРАТ ЗАФИКСИРОВАНО</p>
+              <p className="text-lg">{data.lossCount}</p>
             </div>
             <div className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
               <p className="opacity-70">ПОДСИСТЕМЫ</p>
@@ -135,6 +172,19 @@ export function VitalsScreen() {
                 </p>
               ))}
             </div>
+          </section>
+
+          <section className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>
+            <p className="mb-2 opacity-70">— БЛИЖАЙШИЕ УТРАТЫ (ЗАПИСЬ ОСЫПАЕТСЯ) —</p>
+            {data.degradingSegments.length === 0 && (
+              <p className="opacity-70">НЕТ СЕГМЕНТОВ БЛИЗКО К УТРАТЕ.</p>
+            )}
+            {data.degradingSegments.map((segment) => (
+              <p key={segment.code}>
+                {segment.code} — {segment.title}
+                {segment.dieAt && <span className="opacity-70"> (до {formatDate(segment.dieAt)})</span>}
+              </p>
+            ))}
           </section>
 
           <section className="border p-4" style={{ borderColor: "var(--color-amber-dim)" }}>

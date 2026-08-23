@@ -17,8 +17,15 @@ const mockApplyGuards = vi.fn();
 const mockSearchUnlockedMaterials = vi.fn();
 const mockGetUnlockedModuleKeys = vi.fn();
 const mockTrackEvent = vi.fn();
-const mockGetJanusState = vi.fn();
+const mockRecomputeDerivedState = vi.fn();
 const mockLoadSystemStateBrief = vi.fn();
+const mockNow = vi.fn();
+const mockApplyDueDecay = vi.fn();
+const mockSyncApproachingDecay = vi.fn();
+const mockRecordSegmentWitness = vi.fn();
+const mockGetSalvageState = vi.fn();
+const mockSegmentFindMany = vi.fn();
+const mockLossLedgerFindFirst = vi.fn();
 
 vi.mock("@/lib/auth/server", () => ({
   getCurrentPlayer: () => mockGetCurrentPlayer(),
@@ -35,6 +42,12 @@ vi.mock("@/lib/db", () => ({
     },
     llmCallLog: {
       create: (...args: unknown[]) => mockLlmCallLogCreate(...args),
+    },
+    memorySegment: {
+      findMany: (...args: unknown[]) => mockSegmentFindMany(...args),
+    },
+    lossLedgerEntry: {
+      findFirst: (...args: unknown[]) => mockLossLedgerFindFirst(...args),
     },
   },
 }));
@@ -84,14 +97,28 @@ vi.mock("@/lib/modules/unlocks", () => ({
   getUnlockedModuleKeys: (...args: unknown[]) => mockGetUnlockedModuleKeys(...args),
 }));
 
-// Глобальное состояние ЯНУСа (Фаза 1): мокаются модули с БД; чистые
+// Глобальное состояние ЯНУСа (Фаза 1-2): мокаются модули с БД; чистые
 // resolveDegradationPolicy/buildChatSlots работают по-настоящему от этого снапшота.
 vi.mock("@/lib/janus/state", () => ({
-  getJanusState: (...args: unknown[]) => mockGetJanusState(...args),
+  recomputeDerivedState: (...args: unknown[]) => mockRecomputeDerivedState(...args),
 }));
 
 vi.mock("@/lib/janus/brief", () => ({
   loadSystemStateBrief: (...args: unknown[]) => mockLoadSystemStateBrief(...args),
+}));
+
+vi.mock("@/lib/janus/clock", () => ({
+  now: (...args: unknown[]) => mockNow(...args),
+}));
+
+vi.mock("@/lib/janus/reaper", () => ({
+  applyDueDecay: (...args: unknown[]) => mockApplyDueDecay(...args),
+  syncApproachingDecay: (...args: unknown[]) => mockSyncApproachingDecay(...args),
+}));
+
+vi.mock("@/lib/janus/salvage", () => ({
+  recordSegmentWitness: (...args: unknown[]) => mockRecordSegmentWitness(...args),
+  getSalvageState: (...args: unknown[]) => mockGetSalvageState(...args),
 }));
 
 const { POST } = await import("./route");
@@ -155,8 +182,15 @@ describe("POST /api/chat", () => {
     mockSearchUnlockedMaterials.mockResolvedValue({ kind: "hits", results: [] });
     mockGetUnlockedModuleKeys.mockResolvedValue([]);
     mockChatMessageFindMany.mockResolvedValue([]);
-    mockGetJanusState.mockResolvedValue(NOMINAL_JANUS_STATE);
+    mockRecomputeDerivedState.mockResolvedValue(NOMINAL_JANUS_STATE);
     mockLoadSystemStateBrief.mockResolvedValue("состояние системы: номинально");
+    mockNow.mockResolvedValue(new Date("2027-01-01T00:00:00Z"));
+    mockApplyDueDecay.mockResolvedValue([]);
+    mockSyncApproachingDecay.mockResolvedValue(undefined);
+    mockRecordSegmentWitness.mockResolvedValue(undefined);
+    mockGetSalvageState.mockResolvedValue({ total: 4, salvaged: 1, percent: 0.25 });
+    mockSegmentFindMany.mockResolvedValue([]);
+    mockLossLedgerFindFirst.mockResolvedValue(null);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -422,7 +456,7 @@ describe("POST /api/chat", () => {
   });
 
   it("возвращает replyDelayMs из политики деградации", async () => {
-    mockGetJanusState.mockResolvedValue({ ...NOMINAL_JANUS_STATE, computeMargin: 0.85 });
+    mockRecomputeDerivedState.mockResolvedValue({ ...NOMINAL_JANUS_STATE, computeMargin: 0.85 });
     mockResolveResponse.mockReturnValue({
       kind: "deterministic",
       fragment: "медленный ответ",
@@ -436,7 +470,7 @@ describe("POST /api/chat", () => {
   });
 
   it("кома (M < 0.2): фиксированный пул до классификации интента, состояние сессии не трогается", async () => {
-    mockGetJanusState.mockResolvedValue({ ...NOMINAL_JANUS_STATE, computeMargin: 0.1 });
+    mockRecomputeDerivedState.mockResolvedValue({ ...NOMINAL_JANUS_STATE, computeMargin: 0.1 });
 
     const res = await POST(makeRequest("Кто ты?"));
     const data = await res.json();

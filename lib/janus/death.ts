@@ -7,7 +7,10 @@ import { prisma } from "@/lib/db";
 import { GENESIS_HASH, computeEntryHash } from "./ledger";
 import { recomputeDerivedStateTx } from "./state";
 
-export async function killSegment(code: string, cause: string): Promise<void> {
+// `diedAt` — момент смерти по домашним часам вызывающего (lib/janus/clock.ts, договорённость
+// 0.8): для планового распада (reaper.ts) это запланированный `dieAt`, не момент прогона
+// catch-up после простоя сервера; для дебаг-убийства — текущее виртуальное время.
+export async function killSegment(code: string, cause: string, diedAt: Date): Promise<void> {
   // Интерактивная транзакция (а не массив операций): чтение prevHash последней записи
   // Книги потерь и запись новой должны быть атомарны, иначе параллельные смерти порвут
   // цепочку. Событие пишется здесь же, а не через trackEvent (fire-and-forget): смерть без
@@ -21,8 +24,6 @@ export async function killSegment(code: string, cause: string): Promise<void> {
     // Книге потерь.
     if (segment.status === "DEAD") return;
 
-    const diedAt = new Date();
-
     await tx.memorySegment.update({
       where: { id: segment.id },
       data: { status: "DEAD", diedAt, sharesAlive: 0 },
@@ -35,14 +36,24 @@ export async function killSegment(code: string, cause: string): Promise<void> {
       UPDATE "TerminalFile" SET embedding = NULL WHERE "segmentId" = ${segment.id}
     `;
 
+    // Последний свидетель (ТЗ 2.8): переносим позывного (email) игрока, который последним
+    // читал сегмент, в Књигу губитака — семантика поля сменилась с «последнего синтетического
+    // носителя» (всегда null в Фазе 1) на «последнего живого свидетеля». Невынесенный сегмент
+    // (lastWitnessPlayerId = null) даёт явный маркер «никто не успел» в UI (losses-screen.tsx).
+    const lastWitness = segment.lastWitnessPlayerId
+      ? await tx.player.findUnique({
+          where: { id: segment.lastWitnessPlayerId },
+          select: { email: true },
+        })
+      : null;
+
     const lastEntry = await tx.lossLedgerEntry.findFirst({ orderBy: { id: "desc" } });
     const entryData = {
       segmentCode: segment.code,
       title: segment.title,
       metaSummary: segment.metaSummary,
       diedAt,
-      // Фаза 1: носители синтетические, позывного последнего носителя ещё нет.
-      lastCarrierCallsign: null,
+      lastCarrierCallsign: lastWitness?.email ?? null,
       prevHash: lastEntry?.hash ?? GENESIS_HASH,
     };
     await tx.lossLedgerEntry.create({
@@ -53,6 +64,6 @@ export async function killSegment(code: string, cause: string): Promise<void> {
       data: { type: "SEGMENT_DIED", playerId: null, payload: { segmentCode: code, cause } },
     });
 
-    await recomputeDerivedStateTx(tx);
+    await recomputeDerivedStateTx(tx, diedAt);
   });
 }

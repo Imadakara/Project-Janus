@@ -104,9 +104,13 @@ export function LossesScreen() {
             </p>
             <p className="opacity-70">ВРЕМЯ СМЕРТИ: {formatDate(entry.diedAt)}</p>
             <p>{entry.metaSummary}</p>
-            <p className="opacity-70">
-              ПОСЛЕДНИЙ НОСИТЕЛЬ: {entry.lastCarrierCallsign ?? "НЕ УСТАНОВЛЕН"}
-            </p>
+            {entry.lastCarrierCallsign ? (
+              <p className="opacity-70">ПОСЛЕДНИЙ СВИДЕТЕЛЬ: {entry.lastCarrierCallsign}</p>
+            ) : (
+              // Никто не читал сегмент до утраты (ТЗ 2.8) — явный маркер, не тихая
+              // заглушка: снижает потолок счётчика спасённого навсегда (lib/janus/salvage.ts).
+              <p style={{ color: "var(--color-amber)" }}>!! НИКТО НЕ УСПЕЛ !!</p>
+            )}
             <p className="text-xs opacity-50">SHA-256: {entry.hash.slice(0, 16)}…</p>
           </section>
         ))}

@@ -2,7 +2,14 @@ import type { Role } from "@/app/generated/prisma/client";
 import { embedText, toVectorLiteral } from "@/lib/embeddings/client";
 import { prisma } from "@/lib/db";
 
-export type RagResult = { fileId: string; filename: string; snippet: string };
+export type RagResult = {
+  fileId: string;
+  filename: string;
+  snippet: string;
+  // Фаза 2 (2.6): попадание файла в контекст full_llm-ответа засчитывается как контакт
+  // игрока с сегментом — null, если файл не привязан к смертному сегменту памяти.
+  segmentId: string | null;
+};
 
 // Итог поиска: либо сниппеты живых материалов, либо маркер утраты — топ семантического
 // поиска пришёлся на tombstone мёртвого сегмента (ТЗ 1.3). Маркер перехватывается в
@@ -48,9 +55,15 @@ export async function searchUnlockedMaterials(
 
   const [fileRows, tombstoneRows] = await Promise.all([
     prisma.$queryRaw<
-      Array<{ id: string; filename: string; fullContent: string; distance: number }>
+      Array<{
+        id: string;
+        filename: string;
+        fullContent: string;
+        segmentId: string | null;
+        distance: number;
+      }>
     >`
-      SELECT tf.id, tf.filename, tf."fullContent",
+      SELECT tf.id, tf.filename, tf."fullContent", tf."segmentId",
              tf.embedding <=> ${vectorLiteral}::vector AS distance
       FROM "TerminalFile" tf
       LEFT JOIN "MemorySegment" ms ON ms.id = tf."segmentId"
@@ -83,6 +96,7 @@ export async function searchUnlockedMaterials(
       fileId: row.id,
       filename: row.filename,
       snippet: row.fullContent.slice(0, SNIPPET_LENGTH),
+      segmentId: row.segmentId,
     })),
   };
 }

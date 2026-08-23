@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentPlayer } from "@/lib/auth/server";
 import { killSegment } from "@/lib/janus/death";
 import { getJanusDebugSnapshot } from "@/lib/janus/debug-snapshot";
+import { now } from "@/lib/janus/clock";
 
 const schema = z.object({
   segmentCode: z.string().min(1),
@@ -32,6 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "СЕГМЕНТ НЕ НАЙДЕН." }, { status: 404 });
   }
 
-  await killSegment(parsed.data.segmentCode, parsed.data.cause);
+  await killSegment(parsed.data.segmentCode, parsed.data.cause, await now());
   return NextResponse.json(await getJanusDebugSnapshot());
 }

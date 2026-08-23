@@ -6,6 +6,7 @@ import { resolveSubsystemStatuses, subsystemForIntent } from "./subsystems";
 function snapshot(overrides: Partial<JanusStateSnapshot> = {}): JanusStateSnapshot {
   return {
     computeMargin: 1.0,
+    computeMarginOverride: false,
     integrityIndex: 1.0,
     subsystems: { ANALYTICS: "UP", PLANNING: "UP", ARCHIVE: "UP", COMMS: "UP" },
     forecastDeathAt: null,

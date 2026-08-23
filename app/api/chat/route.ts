@@ -11,10 +11,13 @@ import { applyGuards } from "@/lib/ai/guards";
 import { searchUnlockedMaterials } from "@/lib/ai/rag";
 import { trackEvent } from "@/lib/analytics/track";
 import { classifyIntent } from "@/lib/intent/classify";
-import { getJanusState } from "@/lib/janus/state";
+import { recomputeDerivedState } from "@/lib/janus/state";
 import { resolveDegradationPolicy } from "@/lib/janus/degradation";
-import { buildChatSlots } from "@/lib/janus/slots";
+import { buildChatSlots, loadDynamicSlots } from "@/lib/janus/slots";
 import { loadSystemStateBrief } from "@/lib/janus/brief";
+import { now } from "@/lib/janus/clock";
+import { applyDueDecay, syncApproachingDecay } from "@/lib/janus/reaper";
+import { recordSegmentWitness } from "@/lib/janus/salvage";
 import { pickFragment } from "@/lib/scenario/fragments";
 import { COMA_FRAGMENTS, MEMORY_LOST_FRAGMENTS } from "@/lib/scenario/refusal-fragments";
 import { resolveResponse, type ResolveInput } from "@/lib/scenario/resolve";
@@ -54,10 +57,18 @@ export async function POST(request: Request) {
   }
   const playerMessage = parsed.data.message;
 
-  // Глобальное состояние ЯНУСа → политика деградации на этот ход (Фаза 1 «Смертный ЯНУС»).
-  const janusState = await getJanusState();
+  // Фаза 2: виртуальные часы → догоняем просроченные плановые утраты → свежее состояние
+  // (computeMargin по кривой износа от текущего момента, если не override) → политика
+  // деградации на этот ход.
+  const virtualNow = await now();
+  await applyDueDecay(virtualNow);
+  await syncApproachingDecay(virtualNow);
+  const janusState = await recomputeDerivedState(virtualNow);
   const policy = resolveDegradationPolicy(janusState);
-  const slots = buildChatSlots(janusState, player.role);
+  const slots = {
+    ...buildChatSlots(janusState, player.role, virtualNow),
+    ...(await loadDynamicSlots()),
+  };
 
   const session = await getOrCreateActiveSession(player.id);
 
@@ -235,6 +246,13 @@ export async function POST(request: Request) {
         const result = await getLlmProvider().generate(prompt);
         aiText = applyGuards(result.text, resolution.task);
         llmUsage = { ...result.usage, model: result.model, latencyMs: Date.now() - startedAt };
+
+        // Счётчик спасённого (2.6): попадание сегмента в RAG-контекст ответа full_llm —
+        // засчитанный контакт игрока с содержимым, наравне с полным открытием файла
+        // (app/api/terminal/files/[id]/open).
+        for (const hit of ragOutcome.results) {
+          if (hit.segmentId) await recordSegmentWitness(hit.segmentId, player.id, virtualNow);
+        }
       }
     }
   } catch (error) {

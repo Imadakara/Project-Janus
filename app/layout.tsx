@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { CrtScreen } from "@/components/terminal/crt-screen";
+import { DeathCountdown } from "@/components/terminal/death-countdown";
 import { DebugPanel } from "@/components/debug/debug-panel";
 import { DebugProvider } from "@/lib/debug/debug-context";
 import { SessionGuard } from "@/components/auth/session-guard";
@@ -33,6 +34,7 @@ export default async function RootLayout({
           <CrtScreen>
             <SessionGuard isAuthenticated={!!player}>{children}</SessionGuard>
           </CrtScreen>
+          {player && <DeathCountdown />}
           <DebugPanel />
         </DebugProvider>
       </body>

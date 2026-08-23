@@ -240,17 +240,26 @@ model ResponseFragment {
 // Синглтон (единственная строка id=1). Все мутации — только через lib/janus/state.ts.
 model JanusState {
   id             Int   @id // всегда 1
-  computeMargin  Float @default(1.0) // M(t); в Фазе 1 управляется вручную с дебаг-панели
+  computeMargin  Float @default(1.0) // M(t); Фаза 2 — computeMarginAt(now) (lib/janus/wear.ts), если не override
   integrityIndex Float @default(1.0) // доля живой памяти, формула в lib/janus/integrity.ts
+
+  // Фаза 2 (2.4): ручной M-рычаг дебаг-панели Фазы 1 сохранён как override поверх
+  // computeMarginAt(now) — пока true, recomputeDerivedStateTx не трогает computeMargin.
+  // Дебаг-панель обязана явно показывать активный override (ТЗ 2.4).
+  computeMarginOverride Boolean @default(false)
 
   // Статусы подсистем { ANALYTICS|PLANNING|ARCHIVE|COMMS: "UP"|"DOWN" } — производные от
   // computeMargin (lib/janus/subsystems.ts), персистятся для читателей вне политики (PULS).
   subsystems Json @default("{\"ANALYTICS\":\"UP\",\"PLANNING\":\"UP\",\"ARCHIVE\":\"UP\",\"COMMS\":\"UP\"}")
 
-  forecastDeathAt DateTime? // медиана прогноза отказа ядра, lib/janus/forecast.ts
-  forecastP10At   DateTime? // 10-й перцентиль того же прогноза
-  lambdaEstimate  Float     @default(0.016666666666666666) // λ, сут⁻¹; дефолт 1/60 (Р-2 ТЗ)
+  forecastDeathAt DateTime? // Фаза 2: заполняется константой DEATH_AT (lib/janus/calendar.ts), не прогнозом
+  forecastP10At   DateTime? // наследие Фазы 1 (Монте-Карло прогноз); Фаза 2 больше не пишет, оставлено для совместимости
+  lambdaEstimate  Float     @default(0.016666666666666666) // λ, сут⁻¹; дефолт 1/60 (Р-2 ТЗ) — используется отложенным направлением (Приложение В)
   updatedAt       DateTime  @updatedAt
+
+  // Фаза 2, дебаг-виртуальные часы (2.11): смещение относительно системного времени.
+  // lib/janus/clock.ts::now() — единственная точка чтения; в проде всегда 0.
+  debugTimeOffsetMs BigInt @default(0)
 }
 
 enum MemoryClass {
@@ -288,7 +297,42 @@ model MemorySegment {
   // см. тех.описание реализации.
   embedding Unsupported("vector(384)")?
 
-  files TerminalFile[]
+  // --- Фаза 2: предопубликованный распад, счётчик спасённого, последний свидетель ---
+
+  priority Int @default(0) // приоритет ЯНУСа (2.9): выше — важнее для его цели (Р-10)
+
+  // Сегмент, обязанный дожить до DEATH_AT (нарративное ядро, Р-10) — планировщик (reaper.ts)
+  // его не трогает; умирает только в Фазе 4 одной транзакцией со всеми остальными.
+  isImmortalUntilDeath Boolean @default(false)
+
+  // "Вынесен" (2.6): контент хотя бы раз дошёл до живого игрока до утраты. salvagedAt/ByPlayerId
+  // фиксируются один раз (первый вынос); witnessCount растёт при каждом повторном контакте.
+  salvagedAt         DateTime?
+  salvagedByPlayerId String?
+  witnessCount       Int       @default(0)
+
+  // Последний игрок, читавший сегмент (2.8) — на смерти переносится в
+  // LossLedgerEntry.lastCarrierCallsign (переименование семантики поля без миграции).
+  lastWitnessPlayerId String?
+  lastWitnessAt       DateTime?
+
+  decayEvent DecayEvent?
+  files      TerminalFile[]
+}
+
+// Предопубликованное расписание распада (2.2): одна строка на сегмент, сгенерирована
+// scripts/generate-schedule.ts из content/decay-schedule.json при сиде. Планировщик
+// (lib/janus/reaper.ts) выбирает просроченные (dieAt <= now, appliedAt = null) и вызывает
+// killSegment — это ЕДИНСТВЕННЫЙ штатный путь смерти в Фазе 2 (синтетический чурн Фазы 1
+// остаётся дебаг-инструментом).
+model DecayEvent {
+  id          String        @id @default(cuid())
+  segmentCode String        @unique
+  segment     MemorySegment @relation(fields: [segmentCode], references: [code])
+  dieAt       DateTime
+  appliedAt   DateTime?
+
+  @@index([dieAt])
 }
 
 // Книга потерь («Књига губитака»): append-only журнал смертей сегментов с хеш-цепочкой

@@ -5,6 +5,7 @@ import { getCurrentPlayer } from "@/lib/auth/server";
 import { killSegment } from "@/lib/janus/death";
 import { getJanusDebugSnapshot } from "@/lib/janus/debug-snapshot";
 import { recomputeDerivedState } from "@/lib/janus/state";
+import { now } from "@/lib/janus/clock";
 
 // ±доли синтетического сегмента (ТЗ 1.6): видимая причинность — добавление долей отодвигает
 // дату отказа на PULS, снятие приближает. Падение ниже порога k убивает сегмент единственным
@@ -45,10 +46,11 @@ export async function POST(request: Request) {
     data: { sharesAlive: newShares },
   });
 
+  const virtualNow = await now();
   if (newShares < segment.k) {
-    await killSegment(segment.code, "shares_below_threshold");
+    await killSegment(segment.code, "shares_below_threshold", virtualNow);
   } else {
-    await recomputeDerivedState();
+    await recomputeDerivedState(virtualNow);
   }
 
   return NextResponse.json(await getJanusDebugSnapshot());

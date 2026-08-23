@@ -5,6 +5,8 @@ import { trackEvent } from "@/lib/analytics/track";
 import { getUnlockedModuleKeys } from "@/lib/modules/unlocks";
 import { hasModuleAccess } from "@/lib/modules/access";
 import { isTerminalFilesRateLimited } from "@/lib/terminal/rate-limit";
+import { recordSegmentWitness } from "@/lib/janus/salvage";
+import { now } from "@/lib/janus/clock";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const player = await getCurrentPlayer();
@@ -19,7 +21,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const file = await prisma.terminalFile.findUnique({
     where: { id },
-    include: { requiredModule: true },
+    include: { requiredModule: true, segment: { select: { id: true, status: true } } },
   });
 
   if (!file || (file.visibleToRole && file.visibleToRole !== player.role)) {
@@ -37,6 +39,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       granted: false,
       message: `ДОСТУП ОТКЛОНЁН: ТРЕБУЕТСЯ МОДУЛЬ ${file.requiredModule.key}`,
     });
+  }
+
+  // Счётчик спасённого (2.6): полное открытие — засчитанный контакт, но только пока сегмент
+  // ещё жив («вынесен ДО утраты», не после — иначе смысл счётчика теряется).
+  if (file.segment && file.segment.status !== "DEAD") {
+    await recordSegmentWitness(file.segment.id, player.id, await now());
   }
 
   return NextResponse.json({ granted: true, content: file.fullContent });

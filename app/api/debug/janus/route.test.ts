@@ -10,6 +10,7 @@ const mockGetJanusState = vi.fn();
 const mockSegmentFindUnique = vi.fn();
 const mockSegmentFindMany = vi.fn();
 const mockSegmentUpdate = vi.fn();
+const mockNow = vi.fn();
 
 vi.mock("@/lib/auth/server", () => ({
   getCurrentPlayer: () => mockGetCurrentPlayer(),
@@ -31,6 +32,10 @@ vi.mock("@/lib/janus/death", () => ({
 
 vi.mock("@/lib/janus/synthetic-churn", () => ({
   tickChurn: (...args: unknown[]) => mockTickChurn(...args),
+}));
+
+vi.mock("@/lib/janus/clock", () => ({
+  now: (...args: unknown[]) => mockNow(...args),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -74,6 +79,7 @@ describe("дебаг-роуты /api/debug/janus/*", () => {
     });
     mockSegmentFindMany.mockResolvedValue([]);
     mockSegmentUpdate.mockResolvedValue({});
+    mockNow.mockResolvedValue(new Date("2027-01-01T00:00:00Z"));
   });
 
   it.each([
@@ -136,7 +142,11 @@ describe("дебаг-роуты /api/debug/janus/*", () => {
       sharesAlive: 5,
     });
     await postShares(jsonRequest({ segmentCode: "ARHIV-114", delta: -1 }));
-    expect(mockKillSegment).toHaveBeenCalledWith("ARHIV-114", "shares_below_threshold");
+    expect(mockKillSegment).toHaveBeenCalledWith(
+      "ARHIV-114",
+      "shares_below_threshold",
+      new Date("2027-01-01T00:00:00Z"),
+    );
   });
 
   it("shares: мёртвому сегменту доли не возвращаются (409)", async () => {
@@ -161,7 +171,11 @@ describe("дебаг-роуты /api/debug/janus/*", () => {
 
   it("kill-segment: вызывает killSegment с причиной по умолчанию", async () => {
     await postKill(jsonRequest({ segmentCode: "ARHIV-114" }));
-    expect(mockKillSegment).toHaveBeenCalledWith("ARHIV-114", "debug_kill");
+    expect(mockKillSegment).toHaveBeenCalledWith(
+      "ARHIV-114",
+      "debug_kill",
+      new Date("2027-01-01T00:00:00Z"),
+    );
   });
 
   it("tick-churn: живые сегменты чурнятся, упавшие ниже k умирают через killSegment", async () => {
@@ -176,7 +190,11 @@ describe("дебаг-роуты /api/debug/janus/*", () => {
     expect(res.status).toBe(200);
     expect(mockSegmentUpdate).toHaveBeenCalledTimes(2);
     expect(mockKillSegment).toHaveBeenCalledOnce();
-    expect(mockKillSegment).toHaveBeenCalledWith("SLAB-2", "churn");
+    expect(mockKillSegment).toHaveBeenCalledWith(
+      "SLAB-2",
+      "churn",
+      new Date("2027-01-01T00:00:00Z"),
+    );
     expect(mockRecomputeDerivedState).toHaveBeenCalled();
   });
 });

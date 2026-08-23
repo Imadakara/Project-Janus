@@ -4,6 +4,8 @@ const mockGetCurrentPlayer = vi.fn();
 const mockFindUnique = vi.fn();
 const mockGetUnlockedModuleKeys = vi.fn();
 const mockTrackEvent = vi.fn();
+const mockRecordSegmentWitness = vi.fn();
+const mockNow = vi.fn();
 
 vi.mock("@/lib/auth/server", () => ({
   getCurrentPlayer: () => mockGetCurrentPlayer(),
@@ -23,6 +25,14 @@ vi.mock("@/lib/modules/unlocks", () => ({
 
 vi.mock("@/lib/analytics/track", () => ({
   trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
+
+vi.mock("@/lib/janus/salvage", () => ({
+  recordSegmentWitness: (...args: unknown[]) => mockRecordSegmentWitness(...args),
+}));
+
+vi.mock("@/lib/janus/clock", () => ({
+  now: (...args: unknown[]) => mockNow(...args),
 }));
 
 const { POST } = await import("./route");
@@ -45,6 +55,8 @@ describe("POST /api/terminal/files/[id]/open", () => {
     vi.clearAllMocks();
     mockGetCurrentPlayer.mockResolvedValue(PLAYER);
     mockFindUnique.mockResolvedValue(FILE);
+    mockNow.mockResolvedValue(new Date("2027-01-01T00:00:00Z"));
+    mockRecordSegmentWitness.mockResolvedValue(undefined);
   });
 
   it("denies access and logs an event when the module is not unlocked", async () => {
@@ -86,5 +98,33 @@ describe("POST /api/terminal/files/[id]/open", () => {
 
     const res = await POST(new Request("http://test"), makeParams("file-1"));
     expect(res.status).toBe(404);
+  });
+
+  it("records a salvage witness when opening a file tied to a live segment", async () => {
+    mockFindUnique.mockResolvedValue({
+      ...FILE,
+      segment: { id: "seg-1", status: "ALIVE" },
+    });
+    mockGetUnlockedModuleKeys.mockResolvedValue(["MAP_VIEWER"]);
+
+    await POST(new Request("http://test"), makeParams("file-1"));
+
+    expect(mockRecordSegmentWitness).toHaveBeenCalledWith(
+      "seg-1",
+      "player-1",
+      new Date("2027-01-01T00:00:00Z"),
+    );
+  });
+
+  it("does not record a witness for a file tied to an already-dead segment", async () => {
+    mockFindUnique.mockResolvedValue({
+      ...FILE,
+      segment: { id: "seg-1", status: "DEAD" },
+    });
+    mockGetUnlockedModuleKeys.mockResolvedValue(["MAP_VIEWER"]);
+
+    await POST(new Request("http://test"), makeParams("file-1"));
+
+    expect(mockRecordSegmentWitness).not.toHaveBeenCalled();
   });
 });

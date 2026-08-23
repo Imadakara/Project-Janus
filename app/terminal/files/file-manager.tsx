@@ -63,6 +63,26 @@ export function FileManager() {
     }
   }, []);
 
+  // «ВЫНЕСТИ» (ТЗ 2.7): скачивание через blob — без хранилищ на устройстве игрока
+  // (договорённость 0.6), файл просто уходит в браузерную загрузку и всё.
+  const exportFile = useCallback(async (fileId: string, filename: string) => {
+    const res = await fetch(`/api/terminal/files/${fileId}/export`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setActionOutput(data?.error ?? "ОШИБКА ВЫНОСА.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const canAnalyze = unlockedModules?.includes("FILE_ANALYZER") ?? false;
   const selectedFile = files.find((f) => f.id === selectedFileId) ?? null;
   const programRoute =
@@ -169,6 +189,18 @@ export function FileManager() {
               <p className="opacity-70">
                 ОТКРЫТИЕ НЕДОСТУПНО: ТРЕБУЕТСЯ МОДУЛЬ {selectedFile.requiredModuleKey}
               </p>
+            )}
+            {!programRoute && unlockedModules?.includes(selectedFile.requiredModuleKey) && (
+              <button
+                type="button"
+                onClick={() =>
+                  exportFile(selectedFile.id, `${selectedFile.filename}${selectedFile.extension}.TXT`)
+                }
+                className="border px-3 py-1"
+                style={{ borderColor: "var(--color-amber-dim)" }}
+              >
+                ВЫНЕСТИ
+              </button>
             )}
           </div>
           {actionOutput && (

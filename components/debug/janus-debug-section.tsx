@@ -18,6 +18,7 @@ type Segment = {
 type Snapshot = {
   state: {
     computeMargin: number;
+    computeMarginOverride: boolean;
     integrityIndex: number;
     subsystems: Record<string, "UP" | "DOWN">;
     forecastDeathAt: string | null;
@@ -25,7 +26,14 @@ type Snapshot = {
     lambdaEstimate: number;
   };
   segments: Segment[];
+  debugTimeOffsetMs: number;
+  virtualNow: string;
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+const HOUR_MS = 60 * 60 * 1000;
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -102,7 +110,12 @@ export function JanusDebugSection() {
       {snapshot && (
         <>
           <div className="flex flex-col gap-0.5">
-            <p>M (COMPUTE): {snapshot.state.computeMargin.toFixed(2)}</p>
+            <p>
+              M (COMPUTE): {snapshot.state.computeMargin.toFixed(2)}
+              {snapshot.state.computeMarginOverride && (
+                <span style={{ color: "var(--color-debug-text-muted)" }}> [OVERRIDE]</span>
+              )}
+            </p>
             <p>INTEGRITY: {Math.round(snapshot.state.integrityIndex * 100)}%</p>
             <p>
               SUBSYSTEMS:{" "}
@@ -127,15 +140,95 @@ export function JanusDebugSection() {
             />
             <span className="w-10 text-right">{margin.toFixed(2)}</span>
           </label>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => post("/api/debug/janus/compute", { computeMargin: margin })}
-            className="border px-2 py-1"
-            style={{ borderColor: "var(--color-debug-border)" }}
-          >
-            ПРИМЕНИТЬ M
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => post("/api/debug/janus/compute", { computeMargin: margin })}
+              className="flex-1 border px-2 py-1"
+              style={{ borderColor: "var(--color-debug-border)" }}
+            >
+              ПРИМЕНИТЬ M
+            </button>
+            {snapshot.state.computeMarginOverride && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => post("/api/debug/janus/compute/clear")}
+                className="flex-1 border px-2 py-1"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                СНЯТЬ OVERRIDE
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <p style={{ color: "var(--color-debug-text-muted)" }}>— ВИРТУАЛЬНОЕ ВРЕМЯ —</p>
+            <p>
+              {formatDate(snapshot.virtualNow)}
+              {snapshot.debugTimeOffsetMs !== 0 && (
+                <span style={{ color: "var(--color-debug-text-muted)" }}>
+                  {" "}
+                  (СМЕЩЕНИЕ {snapshot.debugTimeOffsetMs > 0 ? "+" : ""}
+                  {Math.round(snapshot.debugTimeOffsetMs / DAY_MS)}с)
+                </span>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => post("/api/debug/janus/time", { action: "advance", deltaMs: DAY_MS })}
+                className="border px-2 py-1"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                +1 СУТКИ
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  post("/api/debug/janus/time", { action: "advance", deltaMs: WEEK_MS })
+                }
+                className="border px-2 py-1"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                +1 НЕДЕЛЯ
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  post("/api/debug/janus/time", { action: "advance", deltaMs: MONTH_MS })
+                }
+                className="border px-2 py-1"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                +1 МЕСЯЦ
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  post("/api/debug/janus/time", { action: "jumpToDeathMinus", marginMs: HOUR_MS })
+                }
+                className="border px-2 py-1"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                К ДАТЕ СМЕРТИ −1Ч
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => post("/api/debug/janus/time", { action: "reset" })}
+                className="border px-2 py-1"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                СБРОС
+              </button>
+            </div>
+          </div>
 
           <button
             type="button"
