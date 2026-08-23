@@ -61,8 +61,18 @@ vi.mock("@/lib/ai/rate-limit", () => ({
   isFullLlmBudgetExceeded: (...args: unknown[]) => mockIsFullLlmBudgetExceeded(...args),
 }));
 
+const mockGetLlmProvider = vi.fn();
+
 vi.mock("@/lib/ai/providers", () => ({
-  getLlmProvider: () => ({ generate: (...args: unknown[]) => mockGenerate(...args) }),
+  getLlmProvider: (...args: unknown[]) => mockGetLlmProvider(...args),
+  // Настоящий класс, а не мок-заглушка — app/api/chat/route.ts различает таймаут локальной LLM
+  // от прочих ошибок через `instanceof`, это должно продолжать работать в тестах.
+  LocalLlmTimeoutError: class LocalLlmTimeoutError extends Error {
+    constructor() {
+      super("таймаут локальной LLM");
+      this.name = "LocalLlmTimeoutError";
+    }
+  },
 }));
 
 vi.mock("@/lib/ai/prompt-builder", () => ({
@@ -122,6 +132,7 @@ vi.mock("@/lib/janus/salvage", () => ({
 }));
 
 const { POST } = await import("./route");
+const { LocalLlmTimeoutError } = await import("@/lib/ai/providers");
 
 const NOMINAL_JANUS_STATE = {
   computeMargin: 1.0,
@@ -159,6 +170,12 @@ function makeRequest(message: string, useLlm?: boolean) {
   });
 }
 
+// Для тумблеров «Локальная LLM» / «Форсировать Слой 3» — makeRequest выше не расширяем, чтобы
+// не трогать сигнатуру во всех уже существующих вызовах.
+function makeRequestWithBody(body: Record<string, unknown>) {
+  return new Request("http://test", { method: "POST", body: JSON.stringify(body) });
+}
+
 describe("POST /api/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -178,6 +195,9 @@ describe("POST /api/chat", () => {
       text: "ответ ИИ",
       usage: { inputTokens: 10, outputTokens: 5 },
       model: "test-model",
+    });
+    mockGetLlmProvider.mockReturnValue({
+      generate: (...args: unknown[]) => mockGenerate(...args),
     });
     mockSearchUnlockedMaterials.mockResolvedValue({ kind: "hits", results: [] });
     mockGetUnlockedModuleKeys.mockResolvedValue([]);
@@ -522,5 +542,160 @@ describe("POST /api/chat", () => {
         }),
       }),
     );
+  });
+
+  describe("тумблеры «Локальная LLM» и «Форсировать Слой 3» (панель отладки)", () => {
+    it("передаёт llmSource в getLlmProvider для дебаг-игрока", async () => {
+      mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+      mockResolveResponse.mockReturnValue({
+        kind: "light_llm",
+        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+        escalationReason: "desync_light",
+      });
+
+      await POST(makeRequestWithBody({ message: "бла", useLlm: true, llmSource: "local" }));
+
+      expect(mockGetLlmProvider).toHaveBeenCalledWith("local");
+    });
+
+    it("игнорирует llmSource=local для не-дебаг игрока — провайдер вызывается без override", async () => {
+      mockResolveResponse.mockReturnValue({
+        kind: "light_llm",
+        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+        escalationReason: "desync_light",
+      });
+
+      await POST(makeRequestWithBody({ message: "бла", useLlm: true, llmSource: "local" }));
+
+      expect(mockGetLlmProvider).toHaveBeenCalledWith(undefined);
+    });
+
+    it("локальный источник обнуляет часовой бюджет full_llm — локальный вызов ничего не стоит", async () => {
+      mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+      mockIsFullLlmBudgetExceeded.mockReturnValue(true);
+      mockResolveResponse.mockReturnValue({
+        kind: "deterministic",
+        fragment: "детерминированный ответ",
+        stateUpdate: STATE_UPDATE,
+      });
+
+      await POST(makeRequestWithBody({ message: "бла", llmSource: "local" }));
+
+      expect(mockResolveResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ fullLlmBudgetExceeded: false }),
+      );
+    });
+
+    it("внешний источник у дебаг-игрока по-прежнему уважает часовой бюджет full_llm", async () => {
+      mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+      mockIsFullLlmBudgetExceeded.mockReturnValue(true);
+      mockResolveResponse.mockReturnValue({
+        kind: "deterministic",
+        fragment: "детерминированный ответ",
+        stateUpdate: STATE_UPDATE,
+      });
+
+      await POST(makeRequestWithBody({ message: "бла", llmSource: "claude" }));
+
+      expect(mockResolveResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ fullLlmBudgetExceeded: true }),
+      );
+    });
+
+    it("передаёт forceFullLlm в resolveResponse для дебаг-игрока", async () => {
+      mockGetCurrentPlayer.mockResolvedValue({ ...PLAYER, isDebug: true });
+      mockResolveResponse.mockReturnValue({
+        kind: "deterministic",
+        fragment: "детерминированный ответ",
+        stateUpdate: STATE_UPDATE,
+      });
+
+      await POST(makeRequestWithBody({ message: "бла", forceFullLlm: true }));
+
+      expect(mockResolveResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ forceFullLlm: true }),
+      );
+    });
+
+    it("игнорирует forceFullLlm=true для не-дебаг игрока", async () => {
+      mockResolveResponse.mockReturnValue({
+        kind: "deterministic",
+        fragment: "детерминированный ответ",
+        stateUpdate: STATE_UPDATE,
+      });
+
+      await POST(makeRequestWithBody({ message: "бла", forceFullLlm: true }));
+
+      expect(mockResolveResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ forceFullLlm: false }),
+      );
+    });
+
+    it("таймаут локальной LLM в light-режиме отдаёт техническую заглушку вместо 502", async () => {
+      mockResolveResponse.mockReturnValue({
+        kind: "light_llm",
+        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+        escalationReason: "desync_light",
+      });
+      mockGenerate.mockRejectedValue(new LocalLlmTimeoutError());
+
+      const res = await POST(makeRequest("бла бла бла"));
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.message).toBe("ОШИБКА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.");
+      expect(mockLlmCallLogCreate).not.toHaveBeenCalled();
+      expect(mockChatMessageCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            handledByLayer: "LIGHT_LLM",
+            escalationReason: "local_llm_timeout",
+            content: "ОШИБКА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.",
+          }),
+        }),
+      );
+    });
+
+    it("таймаут локальной LLM в full-режиме отдаёт техническую заглушку вместо 502", async () => {
+      mockResolveResponse.mockReturnValue({
+        kind: "full_llm",
+        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 4, fewShotExamples: [] },
+        stateUpdate: { ...STATE_UPDATE, desyncScore: 6, lastConfidenceTier: "low" },
+        escalationReason: "desync_full",
+      });
+      mockGenerate.mockRejectedValue(new LocalLlmTimeoutError());
+
+      const res = await POST(makeRequest("синтезируй мне всё"));
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.message).toBe("ОШИБКА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.");
+      expect(mockRecordSegmentWitness).not.toHaveBeenCalled();
+      expect(mockChatMessageCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            handledByLayer: "FULL_LLM",
+            escalationReason: "local_llm_timeout",
+          }),
+        }),
+      );
+    });
+
+    it("прочие ошибки провайдера (не таймаут) по-прежнему отдают 502", async () => {
+      mockResolveResponse.mockReturnValue({
+        kind: "light_llm",
+        task: { tone: "x", forbiddenTopics: [], allowedHints: [], maxSentences: 2, fewShotExamples: [] },
+        stateUpdate: { ...STATE_UPDATE, desyncScore: 3, lastConfidenceTier: "low" },
+        escalationReason: "desync_light",
+      });
+      mockGenerate.mockRejectedValue(new Error("сервер лежит"));
+
+      const res = await POST(makeRequest("бла бла бла"));
+
+      expect(res.status).toBe(502);
+    });
   });
 });

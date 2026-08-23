@@ -41,8 +41,31 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const { useLlm, setSessionDebug, pushAiTurn, seedAiTurnLog, registerClearChatHandler } =
-    useDebug();
+  const {
+    useLlm,
+    llmSource,
+    forceFullLlm,
+    setSessionDebug,
+    pushAiTurn,
+    seedAiTurnLog,
+    registerClearChatHandler,
+  } = useDebug();
+  const [elapsedSec, setElapsedSec] = useState(0);
+
+  // Живой таймер ожидания — актуален только для локальной LLM (лимит 60с, см.
+  // lib/ai/providers/local.ts): внешний провайдер такого потолка не имеет, отдельный счётчик
+  // для него не нужен и был бы вводящим в заблуждение.
+  useEffect(() => {
+    if (!isSending || llmSource !== "local") {
+      // Сброс при завершении хода/смене источника — тот же паттерн ресинка, что isDebug в
+      // lib/debug/debug-context.tsx.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setElapsedSec(0);
+      return;
+    }
+    const interval = setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isSending, llmSource]);
 
   // Засеиваем контекст панели отладки уже существующей историей — иначе после F5 лог пуст
   // до следующего хода. Один раз при монтировании.
@@ -89,7 +112,7 @@ export function ChatClient({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, useLlm }),
+        body: JSON.stringify({ message: trimmed, useLlm, llmSource, forceFullLlm }),
       });
       const data = await res.json();
 
@@ -191,7 +214,12 @@ export function ChatClient({
             </div>
           );
         })}
-        {isSending && <p className="opacity-70">ЯНУС ОБРАБАТЫВАЕТ ЗАПРОС...</p>}
+        {isSending && (
+          <p className="opacity-70">
+            ЯНУС ОБРАБАТЫВАЕТ ЗАПРОС...
+            {llmSource === "local" && ` (${elapsedSec}с / 60с, локальная LLM)`}
+          </p>
+        )}
       </div>
 
       {error && <p className="opacity-90">{error}</p>}

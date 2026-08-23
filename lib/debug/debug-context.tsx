@@ -49,6 +49,15 @@ type DebugContextValue = {
   setLogOpen: (value: boolean) => void;
   useLlm: boolean;
   setUseLlm: (value: boolean) => void;
+  // Источник Слоя 3 для тумблера «Локальная LLM» — undefined/"claude" оставляет провайдер из
+  // LLM_PROVIDER (.env), "local" переключает на self-hosted Ollama для этого запроса (см.
+  // lib/ai/providers/index.ts, app/api/chat/route.ts).
+  llmSource: "claude" | "local";
+  setLlmSource: (value: "claude" | "local") => void;
+  // Тумблер «Форсировать Слой 3» — пропускает ожидание desyncScore, вызывает full_llm сразу
+  // (см. lib/scenario/resolve.ts, ResolveInput.forceFullLlm).
+  forceFullLlm: boolean;
+  setForceFullLlm: (value: boolean) => void;
   sessionDebug: SessionDebugState | null;
   setSessionDebug: (state: SessionDebugState | null) => void;
   aiTurnLog: AiTurnLogEntry[];
@@ -79,6 +88,8 @@ export function DebugProvider({
   const [panelOpen, setPanelOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [useLlm, setUseLlm] = useState(false);
+  const [llmSource, setLlmSource] = useState<"claude" | "local">("claude");
+  const [forceFullLlm, setForceFullLlm] = useState(false);
   const [sessionDebug, setSessionDebug] = useState<SessionDebugState | null>(null);
   const [aiTurnLog, setAiTurnLog] = useState<AiTurnLogEntry[]>([]);
   const clearChatHandlerRef = useRef<(() => void) | null>(null);
@@ -128,6 +139,10 @@ export function DebugProvider({
       setLogOpen,
       useLlm,
       setUseLlm,
+      llmSource,
+      setLlmSource,
+      forceFullLlm,
+      setForceFullLlm,
       sessionDebug,
       setSessionDebug,
       aiTurnLog,
@@ -141,6 +156,8 @@ export function DebugProvider({
       panelOpen,
       logOpen,
       useLlm,
+      llmSource,
+      forceFullLlm,
       sessionDebug,
       aiTurnLog,
       pushAiTurn,

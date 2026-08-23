@@ -14,6 +14,10 @@ export function DebugPanel() {
     setLogOpen,
     useLlm,
     setUseLlm,
+    llmSource,
+    setLlmSource,
+    forceFullLlm,
+    setForceFullLlm,
     sessionDebug,
     aiTurnLog,
     clearChat,
@@ -74,6 +78,38 @@ export function DebugPanel() {
               {useLlm
                 ? "Переход на LLM разрешён."
                 : "Переход на LLM заблокирован — сработавшие триггеры эскалации вернут диагностическое сообщение вместо реального вызова модели."}
+            </p>
+
+            <label className="flex items-center justify-between gap-2">
+              <span>Источник LLM</span>
+              <select
+                value={llmSource}
+                onChange={(e) => setLlmSource(e.target.value as "claude" | "local")}
+                className="border bg-transparent px-1 py-0.5"
+                style={{ borderColor: "var(--color-debug-border)" }}
+              >
+                <option value="claude">Внешняя (Claude)</option>
+                <option value="local">Локальная (Ollama)</option>
+              </select>
+            </label>
+            <p style={{ color: "var(--color-debug-text-muted)" }}>
+              {llmSource === "local"
+                ? "Слой 3 отвечает локальная модель (LOCAL_LLM_MODEL из .env), лимит ожидания 60с — по истечении покажется техническая заглушка."
+                : "Слой 3 отвечает внешний провайдер из LLM_PROVIDER (.env)."}
+            </p>
+
+            <label className="flex items-center justify-between gap-2">
+              <span>Форсировать Слой 3</span>
+              <input
+                type="checkbox"
+                checked={forceFullLlm}
+                onChange={(e) => setForceFullLlm(e.target.checked)}
+              />
+            </label>
+            <p style={{ color: "var(--color-debug-text-muted)" }}>
+              {forceFullLlm
+                ? "Каждый ход сразу уходит в FULL_LLM, без ожидания desyncScore (потолок деградации и часовой бюджет всё равно соблюдаются)."
+                : "Обычная эскалация по desyncScore."}
             </p>
 
             <div className="flex gap-2">

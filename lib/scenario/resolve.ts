@@ -61,6 +61,11 @@ export type ResolveInput = {
   slots: Record<string, string>;
   // Готовая секция «состояние системы» для генеративных слоёв (lib/janus/brief.ts).
   systemStateBrief: string;
+  // Тумблер «Форсировать Слой 3» панели отладки (player.isDebug, см. app/api/chat/route.ts) —
+  // пропускает ожидание desyncScore >= DESYNC_FULL_LLM_MIN, но не потолок политики деградации
+  // и не часовой бюджет full_llm: ручное тестирование Слоя 3 должно видеть те же реальные
+  // ограничения, только без утомительного набора сообщений для разгона desyncScore.
+  forceFullLlm?: boolean;
   // Инъекция случайности для «провалов» памяти — тестируемость без моков Math.random.
   rng?: () => number;
 };
@@ -136,6 +141,35 @@ export function resolveResponse(input: ResolveInput): ResolveOutput {
     }
     return { ...output, fragment: pickFragment(MEMORY_LAPSE_FRAGMENTS, slots) };
   };
+
+  // Форс-тумблер отладки — проверяется до нормального порога desyncScore, но после его
+  // расчёта (stateUpdate.desyncScore остаётся честным, сессия не портится принудительным
+  // ходом). Потолок политики и бюджет full_llm всё равно соблюдаются, как в органической
+  // эскалации ниже — иначе дебаг-режим тестировал бы недостижимую в проде конфигурацию.
+  if (input.forceFullLlm) {
+    if (LAYER_RANK.FULL_LLM > LAYER_RANK[policy.maxLayer]) {
+      return withLapse({
+        kind: "deterministic",
+        fragment: pickDegradationFragment(policy, fragmentsByPoolType, slots),
+        stateUpdate,
+        escalationReason: "degradation_cap",
+      });
+    }
+    if (fullLlmBudgetExceeded) {
+      return withLapse({
+        kind: "deterministic",
+        fragment: pickFragment(BUDGET_REFUSAL_FRAGMENTS, slots),
+        stateUpdate,
+        escalationReason: "desync_full_budget_exceeded",
+      });
+    }
+    return {
+      kind: "full_llm",
+      task: buildGenerationTask(intentResult, "full", disposition, fewShotExamples, systemStateBrief),
+      stateUpdate,
+      escalationReason: "desync_full_forced_debug",
+    };
+  }
 
   if (desyncScore >= DESYNC_FULL_LLM_MIN) {
     // Потолок политики деградации — перехват до вызова провайдера, по паттерну тумблера

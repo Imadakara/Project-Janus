@@ -76,6 +76,16 @@ export function explainTurn(input: DebugExplainInput): string {
         `Семантический поиск попал в МЁРТВЫЙ сегмент памяти — контент необратимо утрачен, ` +
         `выдан детерминированный ответ MEMORY_LOST без вызова провайдера.`
       );
+    case "desync_full_forced_debug":
+      return (
+        `[РЕЖИМ ОТЛАДКИ] Слой 3 (full-режим) вызван принудительно тумблером «Форсировать Слой 3» ` +
+        `в панели отладки — порог desyncScore=${desync} ≥ ${DESYNC_FULL_LLM_MIN} не проверялся.`
+      );
+    case "local_llm_timeout":
+      return (
+        `Локальная LLM не ответила за отведённый лимит (60000 мс) — показана техническая ` +
+        `заглушка вместо реального ответа модели.`
+      );
     case null:
     case undefined:
       break;

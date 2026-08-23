@@ -5,7 +5,7 @@ import type { MessageLayer } from "@/app/generated/prisma/client";
 import { getCurrentPlayer } from "@/lib/auth/server";
 import { getOrCreateActiveSession } from "@/lib/chat/session";
 import { isChatRateLimited, isFullLlmBudgetExceeded } from "@/lib/ai/rate-limit";
-import { getLlmProvider } from "@/lib/ai/providers";
+import { getLlmProvider, LocalLlmTimeoutError, type LlmSource } from "@/lib/ai/providers";
 import { buildPrompt } from "@/lib/ai/prompt-builder";
 import { applyGuards } from "@/lib/ai/guards";
 import { searchUnlockedMaterials } from "@/lib/ai/rag";
@@ -33,11 +33,21 @@ import { getUnlockedModuleKeys } from "@/lib/modules/unlocks";
 const HISTORY_LIMIT = 20;
 const MAX_MESSAGE_LENGTH = 2000;
 
+// Заглушка при таймауте локальной LLM (LocalLlmTimeoutError, lib/ai/providers/local.ts) —
+// техническая строка, а не диегетический отказ: тумблер «Локальная LLM» тестирует именно
+// реальную скорость ответа, честная заглушка полезнее фейковой реплики «разрыв связи».
+const LOCAL_LLM_TIMEOUT_PLACEHOLDER = "ОШИБКА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.";
+
 const chatSchema = z.object({
   message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
   // Тумблер «Use LLM» панели отладки — учитывается только для player.isDebug (fail-open по
   // умолчанию, чтобы обычные игроки и старые клиенты без этого поля никогда не блокировались).
   useLlm: z.boolean().default(true),
+  // Тумблеры «Локальная LLM» и «Форсировать Слой 3» панели отладки — как и useLlm выше,
+  // учитываются только для player.isDebug; обычные игроки всегда получают провайдер из
+  // LLM_PROVIDER (.env) и обычную эскалацию по desyncScore, независимо от тела запроса.
+  llmSource: z.enum(["claude", "local"]).optional(),
+  forceFullLlm: z.boolean().default(false),
 });
 
 export async function POST(request: Request) {
@@ -145,16 +155,29 @@ export async function POST(request: Request) {
     loadSystemStateBrief(janusState),
   ]);
 
+  // Дебаг-переопределения источника LLM и форс-эскалации в Слой 3 — только для
+  // player.isDebug, старые/обычные клиенты не могут повлиять на них телом запроса.
+  const debugLlmSource: LlmSource | undefined = player.isDebug ? parsed.data.llmSource : undefined;
+  const debugForceFullLlm = player.isDebug ? parsed.data.forceFullLlm : false;
+
+  // Часовой бюджет full_llm (lib/ai/rate-limit.ts) защищает от раскрутки самого дорогого
+  // ПЛАТНОГО пути — при локальном источнике вызов ничего не стоит, а «Форсировать Слой 3»
+  // ходит в full_llm на каждом сообщении и иначе гарантированно упирается в лимит на 11-м
+  // ходу любой ручной сессии тестирования локальной модели.
+  const fullLlmBudgetExceeded =
+    debugLlmSource === "local" ? false : isFullLlmBudgetExceeded(player.id);
+
   const resolveInput: ResolveInput = {
     intentResult,
     sessionState,
     requiresSynthesis,
     playerRole: player.role,
-    fullLlmBudgetExceeded: isFullLlmBudgetExceeded(player.id),
+    fullLlmBudgetExceeded,
     fragmentsByPoolType,
     policy,
     slots,
     systemStateBrief,
+    forceFullLlm: debugForceFullLlm,
   };
 
   const resolution = resolveResponse(resolveInput);
@@ -172,6 +195,9 @@ export async function POST(request: Request) {
     model: string;
     latencyMs: number;
   } | null = null;
+  // Какой слой реально дошёл до вызова провайдера — нужно вне try, чтобы catch знал, куда
+  // приземлить таймаут-заглушку (LocalLlmTimeoutError), не путая light/full.
+  let attemptedLayer: "LIGHT_LLM" | "FULL_LLM" | null = null;
 
   try {
     if (llmBlocked && (resolution.kind === "light_llm" || resolution.kind === "full_llm")) {
@@ -200,7 +226,8 @@ export async function POST(request: Request) {
         currentMessage: playerMessage,
       });
       const startedAt = Date.now();
-      const result = await getLlmProvider().generate(prompt);
+      attemptedLayer = "LIGHT_LLM";
+      const result = await getLlmProvider(debugLlmSource).generate(prompt);
       aiText = applyGuards(result.text, resolution.task);
       llmUsage = { ...result.usage, model: result.model, latencyMs: Date.now() - startedAt };
     } else {
@@ -243,7 +270,8 @@ export async function POST(request: Request) {
           ragResults: ragOutcome.results,
         });
         const startedAt = Date.now();
-        const result = await getLlmProvider().generate(prompt);
+        attemptedLayer = "FULL_LLM";
+        const result = await getLlmProvider(debugLlmSource).generate(prompt);
         aiText = applyGuards(result.text, resolution.task);
         llmUsage = { ...result.usage, model: result.model, latencyMs: Date.now() - startedAt };
 
@@ -256,11 +284,20 @@ export async function POST(request: Request) {
       }
     }
   } catch (error) {
-    console.error("LLM provider call failed:", error);
-    return NextResponse.json(
-      { error: "СВЯЗЬ С ЯДРОМ СИСТЕМЫ ПРЕРВАНА. ПОВТОРИТЕ ПОПЫТКУ ПОЗЖЕ." },
-      { status: 502 },
-    );
+    // Таймаут локальной LLM (60с, lib/ai/providers/local.ts) — не 502: игрок получает обычный
+    // ход диалога с технической заглушкой вместо реального ответа модели, ход честно
+    // персистится в истории (см. ChatMessage ниже) для последующей ручной оценки скорости.
+    if (error instanceof LocalLlmTimeoutError && attemptedLayer) {
+      handledByLayer = attemptedLayer;
+      escalationReason = "local_llm_timeout";
+      aiText = LOCAL_LLM_TIMEOUT_PLACEHOLDER;
+    } else {
+      console.error("LLM provider call failed:", error);
+      return NextResponse.json(
+        { error: "СВЯЗЬ С ЯДРОМ СИСТЕМЫ ПРЕРВАНА. ПОВТОРИТЕ ПОПЫТКУ ПОЗЖЕ." },
+        { status: 502 },
+      );
+    }
   }
 
   await prisma.chatSession.update({

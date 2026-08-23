@@ -348,3 +348,35 @@ describe("resolveResponse — политика деградации (Фаза 1)
     }
   });
 });
+
+describe("resolveResponse — форс-тумблер «Форсировать Слой 3» (панель отладки)", () => {
+  it("уходит в full_llm сразу, не дожидаясь порога desyncScore", () => {
+    const result = resolveResponse(baseInput({ forceFullLlm: true }));
+
+    expect(result.kind).toBe("full_llm");
+    expect(result.escalationReason).toBe("desync_full_forced_debug");
+    // desyncScore в stateUpdate — честный, не подделанный форс-тумблером: уверенный матч даёт 0.
+    expect(result.stateUpdate.desyncScore).toBe(0);
+  });
+
+  it("всё равно уважает потолок политики деградации (degradation_cap)", () => {
+    const cappedPolicy: DegradationPolicy = { ...NOMINAL_POLICY, maxLayer: "DETERMINISTIC" };
+
+    const result = resolveResponse(baseInput({ forceFullLlm: true, policy: cappedPolicy }));
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(result.escalationReason).toBe("degradation_cap");
+      expect(DEGRADED_FRAGMENTS).toContain(result.fragment);
+    }
+  });
+
+  it("всё равно уважает часовой бюджет full_llm", () => {
+    const result = resolveResponse(baseInput({ forceFullLlm: true, fullLlmBudgetExceeded: true }));
+
+    expect(result.kind).toBe("deterministic");
+    if (result.kind === "deterministic") {
+      expect(result.escalationReason).toBe("desync_full_budget_exceeded");
+    }
+  });
+});
